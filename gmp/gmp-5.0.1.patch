@@ -1,0 +1,277 @@
+diff -crB ../../original/gmp-5.0.1/assert.c ./assert.c
+*** ../../original/gmp-5.0.1/assert.c	2010-02-06 13:43:13.000000000 +0100
+--- ./assert.c	2010-11-17 00:53:31.000000000 +0100
+***************
+*** 32,40 ****
+  {
+    if (filename != NULL && filename[0] != '\0')
+      {
+!       fprintf (stderr, "%s:", filename);
+        if (linenum != -1)
+!         fprintf (stderr, "%d: ", linenum);
+      }
+  }
+  
+--- 32,40 ----
+  {
+    if (filename != NULL && filename[0] != '\0')
+      {
+!       /*fprintf (stderr, "%s:", filename);
+        if (linenum != -1)
+!         fprintf (stderr, "%d: ", linenum);*/
+      }
+  }
+  
+***************
+*** 43,48 ****
+                     const char *expr)
+  {
+    __gmp_assert_header (filename, linenum);
+!   fprintf (stderr, "GNU MP assertion failed: %s\n", expr);
+    abort();
+  }
+--- 43,48 ----
+                     const char *expr)
+  {
+    __gmp_assert_header (filename, linenum);
+!   //fprintf (stderr, "GNU MP assertion failed: %s\n", expr);
+    abort();
+  }
+diff -crB ../../original/gmp-5.0.1/configure ./configure
+*** ../../original/gmp-5.0.1/configure	2010-02-06 13:43:19.000000000 +0100
+--- ./configure	2010-11-29 17:57:46.000000000 +0100
+***************
+*** 4116,4123 ****
+  #
+  cclist="gcc cc"
+  
+! gcc_cflags="-O2 -pedantic"
+! gcc_64_cflags="-O2 -pedantic"
+  cc_cflags="-O"
+  cc_64_cflags="-O"
+  
+--- 4116,4123 ----
+  #
+  cclist="gcc cc"
+  
+! gcc_cflags="-O2 -pedantic -fno-stack-protector"
+! gcc_64_cflags="-O2 -pedantic -fno-stack-protector"
+  cc_cflags="-O"
+  cc_64_cflags="-O"
+  
+diff -crB ../../original/gmp-5.0.1/configure.in ./configure.in
+*** ../../original/gmp-5.0.1/configure.in	2010-02-06 13:43:13.000000000 +0100
+--- ./configure.in	2010-11-29 17:54:26.000000000 +0100
+***************
+*** 400,407 ****
+  #
+  cclist="gcc cc"
+  
+! gcc_cflags="-O2 -pedantic"
+! gcc_64_cflags="-O2 -pedantic"
+  cc_cflags="-O"
+  cc_64_cflags="-O"
+  
+--- 400,407 ----
+  #
+  cclist="gcc cc"
+  
+! gcc_cflags="-O2 -pedantic -fno-stack-protector"
+! gcc_64_cflags="-O2 -pedantic -fno-stack-protector"
+  cc_cflags="-O"
+  cc_64_cflags="-O"
+  
+diff -crB ../../original/gmp-5.0.1/invalid.c ./invalid.c
+*** ../../original/gmp-5.0.1/invalid.c	2010-02-06 13:43:13.000000000 +0100
+--- ./invalid.c	2010-11-16 00:13:29.000000000 +0100
+***************
+*** 67,72 ****
+  void
+  __gmp_invalid_operation (void)
+  {
+!   raise (SIGFPE);
+    abort ();
+  }
+--- 67,72 ----
+  void
+  __gmp_invalid_operation (void)
+  {
+!   //raise (SIGFPE);
+    abort ();
+  }
+diff -crB ../../original/gmp-5.0.1/memory.c ./memory.c
+*** ../../original/gmp-5.0.1/memory.c	2010-02-06 13:43:13.000000000 +0100
+--- ./memory.c	2010-11-16 00:01:54.000000000 +0100
+***************
+*** 41,50 ****
+    size_t req_size = size;
+    size += 2 * BYTES_PER_MP_LIMB;
+  #endif
+!   ret = malloc (size);
+    if (ret == 0)
+      {
+!       fprintf (stderr, "GNU MP: Cannot allocate memory (size=%lu)\n", (long) size);
+        abort ();
+      }
+  
+--- 41,51 ----
+    size_t req_size = size;
+    size += 2 * BYTES_PER_MP_LIMB;
+  #endif
+!   //ret = malloc (size);
+!   ret == 0;
+    if (ret == 0)
+      {
+!       //fprintf (stderr, "GNU MP: Cannot allocate memory (size=%lu)\n", (long) size);
+        abort ();
+      }
+  
+***************
+*** 74,86 ****
+        mp_ptr p = oldptr;
+        if (p[-1] != (0xdeadbeef << 31) + 0xdeafdeed)
+  	{
+! 	  fprintf (stderr, "gmp: (realloc) data clobbered before allocation block\n");
+  	  abort ();
+  	}
+        if (old_size % BYTES_PER_MP_LIMB == 0)
+  	if (p[old_size / BYTES_PER_MP_LIMB] != ~((0xdeadbeef << 31) + 0xdeafdeed))
+  	  {
+! 	    fprintf (stderr, "gmp: (realloc) data clobbered after allocation block\n");
+  	    abort ();
+  	  }
+        oldptr = p - 1;
+--- 75,87 ----
+        mp_ptr p = oldptr;
+        if (p[-1] != (0xdeadbeef << 31) + 0xdeafdeed)
+  	{
+! 	  //fprintf (stderr, "gmp: (realloc) data clobbered before allocation block\n");
+  	  abort ();
+  	}
+        if (old_size % BYTES_PER_MP_LIMB == 0)
+  	if (p[old_size / BYTES_PER_MP_LIMB] != ~((0xdeadbeef << 31) + 0xdeafdeed))
+  	  {
+! 	    //fprintf (stderr, "gmp: (realloc) data clobbered after allocation block\n");
+  	    abort ();
+  	  }
+        oldptr = p - 1;
+***************
+*** 89,98 ****
+    new_size += 2 * BYTES_PER_MP_LIMB;
+  #endif
+  
+!   ret = realloc (oldptr, new_size);
+    if (ret == 0)
+      {
+!       fprintf (stderr, "GNU MP: Cannot reallocate memory (old_size=%lu new_size=%lu)\n", (long) old_size, (long) new_size);
+        abort ();
+      }
+  
+--- 90,100 ----
+    new_size += 2 * BYTES_PER_MP_LIMB;
+  #endif
+  
+!   //ret = realloc (oldptr, new_size);
+!   ret == 0;
+    if (ret == 0)
+      {
+!       //fprintf (stderr, "GNU MP: Cannot reallocate memory (old_size=%lu new_size=%lu)\n", (long) old_size, (long) new_size);
+        abort ();
+      }
+  
+***************
+*** 119,136 ****
+        {
+  	if (p[-1] != (0xdeadbeef << 31) + 0xdeafdeed)
+  	  {
+! 	    fprintf (stderr, "gmp: (free) data clobbered before allocation block\n");
+  	    abort ();
+  	  }
+  	if (blk_size % BYTES_PER_MP_LIMB == 0)
+  	  if (p[blk_size / BYTES_PER_MP_LIMB] != ~((0xdeadbeef << 31) + 0xdeafdeed))
+  	    {
+! 	      fprintf (stderr, "gmp: (free) data clobbered after allocation block\n");
+  	      abort ();
+  	    }
+        }
+      blk_ptr = p - 1;
+    }
+  #endif
+!   free (blk_ptr);
+  }
+--- 121,138 ----
+        {
+  	if (p[-1] != (0xdeadbeef << 31) + 0xdeafdeed)
+  	  {
+! 	    //fprintf (stderr, "gmp: (free) data clobbered before allocation block\n");
+  	    abort ();
+  	  }
+  	if (blk_size % BYTES_PER_MP_LIMB == 0)
+  	  if (p[blk_size / BYTES_PER_MP_LIMB] != ~((0xdeadbeef << 31) + 0xdeafdeed))
+  	    {
+! 	      //fprintf (stderr, "gmp: (free) data clobbered after allocation block\n");
+  	      abort ();
+  	    }
+        }
+      blk_ptr = p - 1;
+    }
+  #endif
+!   //free (blk_ptr);
+  }
+diff -crB ../../original/gmp-5.0.1/mpz/init2.c ./mpz/init2.c
+*** ../../original/gmp-5.0.1/mpz/init2.c	2010-02-06 13:43:14.000000000 +0100
+--- ./mpz/init2.c	2010-11-21 23:54:36.000000000 +0100
+***************
+*** 34,40 ****
+      {
+        if (UNLIKELY (new_alloc > INT_MAX))
+  	{
+! 	  fprintf (stderr, "gmp: overflow in mpz type\n");
+  	  abort ();
+  	}
+      }
+--- 34,40 ----
+      {
+        if (UNLIKELY (new_alloc > INT_MAX))
+  	{
+! 	  //fprintf (stderr, "gmp: overflow in mpz type\n");
+  	  abort ();
+  	}
+      }
+diff -crB ../../original/gmp-5.0.1/mpz/realloc.c ./mpz/realloc.c
+*** ../../original/gmp-5.0.1/mpz/realloc.c	2010-02-06 13:43:14.000000000 +0100
+--- ./mpz/realloc.c	2010-11-21 23:54:53.000000000 +0100
+***************
+*** 35,41 ****
+      {
+        if (UNLIKELY (new_alloc > ULONG_MAX / GMP_NUMB_BITS))
+  	{
+! 	  fprintf (stderr, "gmp: overflow in mpz type\n");
+  	  abort ();
+  	}
+      }
+--- 35,41 ----
+      {
+        if (UNLIKELY (new_alloc > ULONG_MAX / GMP_NUMB_BITS))
+  	{
+! 	  //fprintf (stderr, "gmp: overflow in mpz type\n");
+  	  abort ();
+  	}
+      }
+***************
+*** 43,49 ****
+      {
+        if (UNLIKELY (new_alloc > INT_MAX))
+  	{
+! 	  fprintf (stderr, "gmp: overflow in mpz type\n");
+  	  abort ();
+  	}
+      }
+--- 43,49 ----
+      {
+        if (UNLIKELY (new_alloc > INT_MAX))
+  	{
+! 	  //fprintf (stderr, "gmp: overflow in mpz type\n");
+  	  abort ();
+  	}
+      }

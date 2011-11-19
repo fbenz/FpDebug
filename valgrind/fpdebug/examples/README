@@ -1,0 +1,10 @@
+The floating-point benchmarks from John Walter can be downloaded from his site:
+http://www.fourmilab.ch/fbench/
+
+For better results, please compile with debug information (GCC: -g) and without
+optimizations (GCC: -O0).
+
+If the examples are compiled with the GCC, one can specify whether the x87 FPU or
+the newer SSE instructions should be used for floating-point arithmetic:
+	x87 FPU: 	-mfpmath=387
+	SSE:		-mfpmath=sse

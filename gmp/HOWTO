@@ -1,0 +1,15 @@
+GMP (GNU Multiple Precision Arithmetic Library)
+
+GNU MPFR requires GMP and MPFR is used by FpDebug to perform the side-by-side computation in 
+higher precision. GMP hat to be adjusted because Valgrind does not provide the full C library
+to its tools.
+
+1. Download GMP in version 5.0.1:
+	http://ftp.gnu.org/gnu/gmp/
+2. Apply the patch in the main directory:
+	patch -p1 -i gmp-5.0.1.patch
+3. Build and install GMP
+	See the INSTALL file in the main directory of GMP.
+	Note that the target directory for the GMP installation can be specified. This is useful
+	if GMP is needed by other programs on your machine as the modified versions won't work with them.
+
