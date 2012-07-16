@@ -1,9 +1,5 @@
 FpDebug is a heavyweight Valgrind tool for detecting floating-point accuracy problems.
 
-The tool uses MPFR for its analysis. Because MPFR is run with the tool on top of Valgrind,
-it has only access to the partial C library provided by Valgrind. Thus, a patch for MPFR
-is provided that adjusts it to run on top of Valgrind. As GMP is used by MFPR, a patch for
-GMP is also  provided.
+The tool uses MPFR for its analysis. Because MPFR is run with the tool on top of Valgrind, it has only access to the partial C library provided by Valgrind. Thus, a patch for MPFR is provided that adjusts it to run on top of Valgrind. As GMP is used by MFPR, a patch for GMP is also  provided.
 
 Further information is provided in the HOWTO files in the subdirectories.
-

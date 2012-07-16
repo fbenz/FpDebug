@@ -7,7 +7,8 @@ MPFR hat to be adjusted because Valgrind does not provide the full C library to 
 	http://www.mpfr.org/mpfr-3.0.0/
 2. Apply the patch in the main directory:
 	patch -p1 -i mpfr-3.0.0.patch
-3. Build and install MPFR
+3. Copy src/valgrind_additions.c into the src folder of MPFR.
+4. Build and install MPFR
 	See the INSTALL file in the main directory of MPFR.
 	Note that the target directory for the MPFR installation can be specified. This is useful
 	if MPFR is needed by other programs on your machine as the modified versions won't work with them.
