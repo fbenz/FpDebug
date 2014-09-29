@@ -770,7 +770,8 @@ static Bool isOpFloat(IROp op) {
 		case Iop_DivF64:
 			return False;
 		default:
-			VG_(tool_panic)("Unhandled operation in isOpFloat\n");
+			// TODO warn
+			//VG_(tool_panic)("Unhandled operation in isOpFloat\n");
 			return False;
 	}
 }

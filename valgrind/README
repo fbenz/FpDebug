@@ -1,0 +1,11 @@
+Valgrind 3.7.0 was used.
+
+For installation instructions see the main README.
+
+
+General structure of using Valgrind with FpDebug:
+	valgrind [valgrind options]--tool=fpdebug [fpdebug options] clientprogram [client options]
+
+Example:
+	valgrind --trace-children=yes --tool=fpdebug --precision=128 /glpk-4.47/examples/glpsol --math problem.mod
+

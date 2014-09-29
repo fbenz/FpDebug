@@ -392,9 +392,9 @@ static void opToStr(IROp op) {
       case Iop_SarN8x8: storeOpStr("SarN8x8"); return;
       case Iop_SarN16x4: storeOpStr("SarN16x4"); return;
       case Iop_SarN32x2: storeOpStr("SarN32x2"); return;
-      case Iop_QNarrow16Ux4: storeOpStr("QNarrow16Ux4"); return;
+      /*case Iop_QNarrow16Ux4: storeOpStr("QNarrow16Ux4"); return;
       case Iop_QNarrow16Sx4: storeOpStr("QNarrow16Sx4"); return;
-      case Iop_QNarrow32Sx2: storeOpStr("QNarrow32Sx2"); return;
+      case Iop_QNarrow32Sx2: storeOpStr("QNarrow32Sx2"); return;*/
       case Iop_InterleaveHI8x8: storeOpStr("InterleaveHI8x8"); return;
       case Iop_InterleaveHI16x4: storeOpStr("InterleaveHI16x4"); return;
       case Iop_InterleaveHI32x2: storeOpStr("InterleaveHI32x2"); return;
@@ -730,7 +730,7 @@ static void opToStr(IROp op) {
       case Iop_Rol16x8: storeOpStr("Rol16x8"); return;
       case Iop_Rol32x4: storeOpStr("Rol32x4"); return;
 
-      case Iop_Narrow16x8:   storeOpStr("Narrow16x8"); return;
+      /*case Iop_Narrow16x8:   storeOpStr("Narrow16x8"); return;
       case Iop_Narrow32x4:   storeOpStr("Narrow32x4"); return;
       case Iop_QNarrow16Ux8: storeOpStr("QNarrow16Ux8"); return;
       case Iop_QNarrow32Ux4: storeOpStr("QNarrow32Ux4"); return;
@@ -753,7 +753,7 @@ static void opToStr(IROp op) {
       case Iop_Longen32Ux2: storeOpStr("Longen32Ux2"); return;
       case Iop_Longen8Sx8: storeOpStr("Longen8Sx8"); return;
       case Iop_Longen16Sx4: storeOpStr("Longen16Sx4"); return;
-      case Iop_Longen32Sx2: storeOpStr("Longen32Sx2"); return;
+      case Iop_Longen32Sx2: storeOpStr("Longen32Sx2"); return;*/
 
       case Iop_InterleaveHI8x16: storeOpStr("InterleaveHI8x16"); return;
       case Iop_InterleaveHI16x8: storeOpStr("InterleaveHI16x8"); return;

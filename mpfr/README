@@ -1,0 +1,9 @@
+GNU MPFR (GNU Multiple Precision Floating-Point Reliably)
+
+GNU MPFR is used by FpDebug to perform the side-by-side computation in higher precision.
+MPFR hat to be adjusted because Valgrind does not provide the full C library to its tools.
+
+MPFR 3.0.0 was used:
+http://www.mpfr.org/mpfr-3.0.0/
+
+For installation instructions see the main README.
