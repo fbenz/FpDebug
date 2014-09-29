@@ -16,7 +16,7 @@ $ mkdir pldi; cd pldi
 $ git clone https://github.com/fbenz/FpDebug.git
 
 GMP
-download GMP 5.0.1 and copy into FpDebug/gmp folder
+Unpack GMP 5.0.1 into the 'FpDebug/gmp' folder
 $ patch -p1 -i gmp-5.0.1.patch
 $ ./configure --prefix=/home/test/pldi/FpDebug/gmp/install
 $ make
@@ -25,7 +25,7 @@ fails because of patch
 $ make install
 
 MPFR
-download MPFR 3.0.0 and copy into FpDebug/mpfr folder
+Unpack MPFR 3.0.0 into the 'FpDebug/mpfr' folder
 $ ./configure --prefix=/home/test/pldi/FpDebug/mpfr/install --with-gmp=/home/test/pldi/FpDebug/gmp/install
 $ patch -p1 -i mpfr-3.0.0.patch
 $ make
@@ -34,7 +34,8 @@ fails because of patch
 $ make install
 
 Valgrind
-download Valgrind 3.7.0 und copy into FpDebug/valgrind
+Unpack Valgrind 3.7.0 into the 'FpDebug/valgrind'
+
 Edit configure by adding "fpdebug/Makefile" to the AC_CONFIG_FILES list.
 
 add the following to lines to AM_CFLAGS_BASE in fpdebug/Makefile.in
