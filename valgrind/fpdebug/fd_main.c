@@ -152,6 +152,14 @@ static void fd_print_debug_usage(void) {
 	VG_(printf)("    (none)\n");
 }
 
+static int abs(int x) {
+	if (x >= 0) {
+		return x;
+	} else {
+		return -x;
+	}
+}
+
 /* hash tables for maping the addresses of the original floating-point values
    to the shadow values */
 static VgHashTable* globalMemory 	= NULL;
@@ -3302,9 +3310,7 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 
 		if (clo_bad_cancellations) {
-			Char avgCancellationBadness[10];
-			VG_(percentify)(values[i]->cancellationBadnessSum, values[i]->count * values[i]->cancellationBadnessMax, 2, 10, avgCancellationBadness);
-			VG_(sprintf)(formatBuf, "    cancellation badness - max: %'ld, avg (sum/(count*max)):%s\n", values[i]->cancellationBadnessMax, avgCancellationBadness);
+			VG_(sprintf)(formatBuf, "    cancellation badness - max: %'ld, avg (sum/(count*max)):%.1f%%\n", values[i]->cancellationBadnessMax, values[i]->cancellationBadnessSum * 100.0 / (values[i]->count * values[i]->cancellationBadnessMax));
 			my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 		}
 
