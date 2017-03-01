@@ -3540,7 +3540,7 @@ static void fd_post_clo_init(void) {
 	VG_(umsg)("sim-original=%s\n", clo_simulateOriginal ? "yes" : "no");
 	VG_(umsg)("analyze-all=%s\n", clo_analyze ? "yes" : "no");
 	VG_(umsg)("bad-cancellations=%s\n", clo_bad_cancellations ? "yes" : "no");
-    VG_(umsg)("ignore-end=%s\n", clo_ignore_end ? "yes" : "no");
+  VG_(umsg)("ignore-end=%s\n", clo_ignore_end ? "yes" : "no");
 
 	mpfr_set_default_prec(clo_precision);
 
@@ -3553,7 +3553,7 @@ static void fd_post_clo_init(void) {
 	binOpArgs = VG_(malloc)("fd.init.4", sizeof(BinOp));
 	triOpArgs = VG_(malloc)("fd.init.5", sizeof(TriOp));
 	circRegs = VG_(malloc)("fd.init.6", sizeof(CircularRegs));
-	threadRegisters = VG_(malloc)("fd.init.7", VG_N_THREADS * MAX_REGISTERS * sizeof(ShadowValue));
+	threadRegisters = VG_(malloc)("fd.init.7", VG_N_THREADS * sizeof(ShadowValue**));
 
 	mpfr_inits(meanOrg, meanRelError, NULL);
 	mpfr_inits(stageOrg, stageDiff, stageRelError, NULL);
@@ -3578,10 +3578,12 @@ static void fd_post_clo_init(void) {
 
 	Int j;
 	for (i = 0; i < VG_N_THREADS; i++) {
+		threadRegisters[i] = VG_(malloc)("fd.init.10", MAX_REGISTERS * sizeof(ShadowValue*));
 		for (j = 0; j < MAX_REGISTERS; j++) {
 			threadRegisters[i][j] = NULL;
 		}
 	}
+
 	for (i = 0; i < MAX_TEMPS; i++) {
 		localTemps[i] = NULL;
 	}
