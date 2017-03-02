@@ -1786,9 +1786,13 @@ static void reportUnsupportedOp(IROp op) {
 	}
 }
 
-static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
-                      VexGuestLayout* layout, VexGuestExtents* vge,
-                      IRType gWordTy, IRType hWordTy)
+static
+IRSB* fd_instrument ( VgCallbackClosure* closure,
+                      IRSB* sbIn,
+                      const VexGuestLayout* layout,
+                      const VexGuestExtents* vge,
+                      const VexArchInfo* archinfo_host,
+                      IRType gWordTy, IRType hWordTy )
 {
 	Int			i;
 	IRSB*      	sbOut;
