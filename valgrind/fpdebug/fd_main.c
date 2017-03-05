@@ -1427,7 +1427,7 @@ static void instrumentITE(IRSB* sb, IRTypeEnv* env, IRTemp wrTemp, IRExpr* mux, 
 	Int constArgs = 0;
 	IRStmt* store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->wrTmp)), mkU32(wrTemp));
 	addStmtToIRSB(sb, store);
-	store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->condVal)), mux->Iex.ITE.cond);
+	store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->condVal)), mkU32(mux->Iex.ITE.cond));
 	addStmtToIRSB(sb, store);
 
 	if (expr0->tag == Iex_RdTmp) {
