@@ -9,7 +9,7 @@ sed -e 's,<MPFR_INSTALL_DIR>,'"${MPFR_INSTALL_DIR}"',g' valgrind/fpdebug/Makefil
 rm valgrind/fpdebug/Makefile_tmp.in
 
 cd valgrind
-tar -jxvf valgrind-3.7.0.tar.bz2 --strip 1
+tar -jxvf valgrind-3.12.0.tar.bz2 --strip 1
 # FpDebug has no tests yet and Valgrind excepts some
 cp -R none/tests fpdebug
 # Add fpdebug Makefile to ac_config_files in configure
@@ -21,4 +21,3 @@ sed -e 's,exp-dhat,exp-dhat fpdebug,g' Makefile.in > Makefile_tmp.in
 mv Makefile_tmp.in Makefile.in
 ./configure --prefix="${BASE}"/valgrind/install
 make install
-
