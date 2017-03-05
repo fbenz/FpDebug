@@ -276,7 +276,9 @@ AM_CFLAGS_BASE = \
 	-Wstrict-prototypes \
 	-Wmissing-declarations \
 	@FLAG_W_NO_FORMAT_ZERO_LENGTH@ \
-	-fno-strict-aliasing
+	-fno-strict-aliasing \
+	-I<GMP_INSTALL_DIR>/include/ \
+	-I<MPFR_INSTALL_DIR>/include/
 
 @VGCONF_OS_IS_DARWIN_FALSE@AM_CFLAGS_PIC = -fpic -O -g -fno-omit-frame-pointer -fno-strict-aliasing
 
@@ -396,7 +398,7 @@ TOOL_DEPENDENCIES_@VGCONF_PLATFORM_PRI_CAPS@ = \
 @VGCONF_HAVE_PLATFORM_SEC_TRUE@	$(top_builddir)/coregrind/libcoregrind-@VGCONF_ARCH_SEC@-@VGCONF_OS@.a \
 @VGCONF_HAVE_PLATFORM_SEC_TRUE@	$(top_builddir)/VEX/libvex-@VGCONF_ARCH_SEC@-@VGCONF_OS@.a
 
-TOOL_LDADD_COMMON = -lgcc -lmpfr -lgmp
+TOOL_LDADD_COMMON = -lgcc -Wl,-rpath -Wl,<GMP_INSTALL_DIR>/lib/libgmp.a -Wl,<MPFR_INSTALL_DIR>/lib/libmpfr.a -Wl,<GMP_INSTALL_DIR>/lib/libgmp.a
 TOOL_LDADD_@VGCONF_PLATFORM_PRI_CAPS@ = \
 	$(TOOL_DEPENDENCIES_@VGCONF_PLATFORM_PRI_CAPS@) $(TOOL_LDADD_COMMON)
 
