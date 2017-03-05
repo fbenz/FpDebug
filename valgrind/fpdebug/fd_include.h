@@ -8,7 +8,7 @@
    This file is part of FpDebug, a heavyweight Valgrind tool for
    detecting floating-point accuracy problems.
 
-   Copyright (C) 2010-2011 Florian Benz
+   Copyright (C) 2010-2017 Florian Benz
       florianbenz1@gmail.com
 
    This program is free software; you can redistribute it and/or

@@ -7,7 +7,7 @@
    This file is part of FpDebug, a heavyweight Valgrind tool for
    detecting floating-point accuracy problems.
 
-   Copyright (C) 2010-2011 Florian Benz
+   Copyright (C) 2010-2017 Florian Benz
       florianbenz1@gmail.com
 
    This program is free software; you can redistribute it and/or
@@ -2173,25 +2173,14 @@ IRSB* fd_instrument ( VgCallbackClosure* closure,
 								/* ignored floating-point and related SSE operations */
 								addStmtToIRSB(sbOut, st);
 								break;
-							//case Iop_Recip32Fx4:
-							//case Iop_Sqrt32Fx4:
-							//case Iop_RSqrt32Fx4:
 							case Iop_RoundF32x4_RM:
 							case Iop_RoundF32x4_RP:
 							case Iop_RoundF32x4_RN:
 							case Iop_RoundF32x4_RZ:
-							//case Iop_Recip32F0x4:
-							//case Iop_RSqrt32F0x4:
-							//case Iop_Recip64Fx2:
-							//case Iop_Sqrt64Fx2:
-							//case Iop_RSqrt64Fx2:
-							//case Iop_Recip64F0x2:
-							//case Iop_RSqrt64F0x2:
 							case Iop_SinF64:
 							case Iop_CosF64:
 							case Iop_TanF64:
 							case Iop_2xm1F64:
-							//case Iop_Est5FRSqrt:
 							case Iop_RoundF64toF64_NEAREST:
 							case Iop_RoundF64toF64_NegINF:
 							case Iop_RoundF64toF64_PosINF:
@@ -2251,7 +2240,6 @@ IRSB* fd_instrument ( VgCallbackClosure* closure,
 							case Iop_Max64Fx2:
 							case Iop_Min64Fx2:
 							case Iop_SqrtF64:
-							//case Iop_SqrtF64r32:
 							case Iop_SqrtF32:
 							case Iop_AtanF64:
 							case Iop_Yl2xF64:
@@ -3606,9 +3594,9 @@ static void fd_post_clo_init(void) {
 
 static void fd_pre_clo_init(void) {
    	VG_(details_name)            ("FpDebug");
-   	VG_(details_version)         ("0.1");
+   	VG_(details_version)         ("0.2");
    	VG_(details_description)     ("Floating-point arithmetic debugger");
-   	VG_(details_copyright_author)("Copyright (C) 2010-2011 by Florian Benz.");
+   	VG_(details_copyright_author)("Copyright (C) 2010-2017 by Florian Benz.");
    	VG_(details_bug_reports_to)  ("florianbenz1@gmail.com");
 
    	VG_(basic_tool_funcs)        (fd_post_clo_init,
