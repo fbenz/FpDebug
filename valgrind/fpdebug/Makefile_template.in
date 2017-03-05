@@ -193,7 +193,6 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PERL = @PERL@
-PREFERRED_STACK_BOUNDARY = @PREFERRED_STACK_BOUNDARY@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -267,16 +266,14 @@ inplacedir = $(top_builddir)/.in_place
 
 # Baseline flags for all compilations.  Aim here is to maximise
 # performance and get whatever useful warnings we can out of gcc.
-AM_CFLAGS_BASE = \
-	-O2 -g \
-	-Wall \
-	-Wmissing-prototypes \
-	-Wshadow \
-	-Wpointer-arith \
-	-Wstrict-prototypes \
-	-Wmissing-declarations \
-	@FLAG_W_NO_FORMAT_ZERO_LENGTH@ \
-	-fno-strict-aliasing \
+AM_CFLAGS_BASE = -O2 -g -std=gnu99 -Wall -Wmissing-prototypes -Wshadow \
+	-Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+	-Wcast-align -Wcast-qual -Wwrite-strings \
+	-Wempty-body -Wformat  \
+	-Wformat-security -Wignored-qualifiers \
+	-Wmissing-parameter-type -Wold-style-declaration \
+	-fno-stack-protector  \
+	-fno-strict-aliasing -fno-builtin \
 	-I<GMP_INSTALL_DIR>/include/ \
 	-I<MPFR_INSTALL_DIR>/include/
 
@@ -319,13 +316,13 @@ AM_CPPFLAGS_@VGCONF_PLATFORM_PRI_CAPS@ = \
 @VGCONF_HAVE_PLATFORM_SEC_TRUE@	-DVGP_@VGCONF_ARCH_SEC@_@VGCONF_OS@=1
 
 AM_FLAG_M3264_X86_LINUX = @FLAG_M32@
-AM_CFLAGS_X86_LINUX = @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ \
+AM_CFLAGS_X86_LINUX = @FLAG_M32@ \
 			 	$(AM_CFLAGS_BASE)
 
 AM_CCASFLAGS_X86_LINUX = $(AM_CPPFLAGS_X86_LINUX) @FLAG_M32@ -g
 AM_FLAG_M3264_AMD64_LINUX = @FLAG_M64@
 AM_CFLAGS_AMD64_LINUX = @FLAG_M64@ -fomit-frame-pointer \
-				@PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
+				$(AM_CFLAGS_BASE)
 
 AM_CCASFLAGS_AMD64_LINUX = $(AM_CPPFLAGS_AMD64_LINUX) @FLAG_M64@ -g
 AM_FLAG_M3264_PPC32_LINUX = @FLAG_M32@
@@ -335,7 +332,7 @@ AM_FLAG_M3264_PPC64_LINUX = @FLAG_M64@
 AM_CFLAGS_PPC64_LINUX = @FLAG_M64@ $(AM_CFLAGS_BASE)
 AM_CCASFLAGS_PPC64_LINUX = $(AM_CPPFLAGS_PPC64_LINUX) @FLAG_M64@ -g
 AM_FLAG_M3264_ARM_LINUX = @FLAG_M32@
-AM_CFLAGS_ARM_LINUX = @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ \
+AM_CFLAGS_ARM_LINUX = @FLAG_M32@ \
 			 	$(AM_CFLAGS_BASE) -marm
 
 AM_CCASFLAGS_ARM_LINUX = $(AM_CPPFLAGS_ARM_LINUX) @FLAG_M32@ -marm -g
