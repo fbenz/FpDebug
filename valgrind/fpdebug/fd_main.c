@@ -3314,7 +3314,11 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 
 		if (clo_bad_cancellations) {
-			VG_(sprintf)(formatBuf, "    cancellation badness - max: %'ld, avg (sum/(count*max)):%.1f%%\n", values[i]->cancellationBadnessMax, values[i]->cancellationBadnessSum * 100.0 / (values[i]->count * values[i]->cancellationBadnessMax));
+			Double avg = 0;
+			if (values[i]->count != 0 && values[i]->cancellationBadnessMax != 0) {
+				avg = values[i]->cancellationBadnessSum * 100.0 / (values[i]->count * values[i]->cancellationBadnessMax);
+			}
+			VG_(sprintf)(formatBuf, "    cancellation badness - max: %'ld, avg (sum/(count*max)): %.1f%%\n", values[i]->cancellationBadnessMax, avg);
 			my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 		}
 
