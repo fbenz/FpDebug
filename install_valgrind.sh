@@ -21,3 +21,4 @@ mv Makefile_tmp.in Makefile.in
 # FpDebug has no tests yet and Valgrind excepts some
 cp -R none/tests fpdebug
 make install
+
