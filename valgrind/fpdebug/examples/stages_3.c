@@ -32,6 +32,6 @@ int main( int argc, const char* argv[] )
 
 	printf("Sum: %.7e\n", sum);
 
-	VALGRIND_PRINT_ERROR_FLOAT(&"sum", &sum);
+	VALGRIND_PRINT_ERROR(&"sum", &sum);
 }
 
