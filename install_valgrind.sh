@@ -18,7 +18,5 @@ chmod +x configure
 sed -e 's,exp-dhat,exp-dhat fpdebug,g' Makefile.in > Makefile_tmp.in
 mv Makefile_tmp.in Makefile.in
 ./configure --prefix="${BASE}"/valgrind/install
-# FpDebug has no tests yet and Valgrind excepts some
-cp -R none/tests fpdebug
 make install
 
