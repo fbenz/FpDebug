@@ -9,6 +9,6 @@ valgrind [valgrind options]--tool=fpdebug [fpdebug options] clientprogram [clien
 [source,bash]
 .Example
 ----
-valgrind --trace-children=yes --tool=fpdebug --precision=128 test_1 --math problem.mod
+valgrind --trace-children=yes --tool=fpdebug --precision=128 glpk-4.61/examples/glpsol --math problem.mod
 ----
 
