@@ -122,7 +122,7 @@ static UInt putCount 						= 0;
 static UInt putsIgnored 					= 0;
 static UInt maxTemps 						= 0;
 
-static Bool fd_process_cmd_line_option(Char* arg) {
+static Bool fd_process_cmd_line_options(const HChar* arg) {
 	if VG_BINT_CLO(arg, "--precision", clo_precision, MPFR_PREC_MIN, MPFR_PREC_MAX) {}
 	else if VG_BOOL_CLO(arg, "--mean-error", clo_computeMeanValue) {}
 	else if VG_BOOL_CLO(arg, "--ignore-libraries", clo_ignoreLibraries) {}
@@ -181,9 +181,9 @@ static ShadowConst* 	sConst[CONST_COUNT];
 static Stage* 			stages[MAX_STAGES];
 static StageReport*		stageReports[MAX_STAGES];
 
-static Char 			formatBuf[FORMATBUF_SIZE];
+static HChar 			formatBuf[FORMATBUF_SIZE];
 static InlIPCursor* description = NULL;
-static Char 			filename[FILENAME_SIZE];
+static HChar 			filename[FILENAME_SIZE];
 static Char 			fwrite_buf[FWRITE_BUFSIZE];
 
 static mpfr_t meanOrg, meanRelError;
@@ -266,7 +266,7 @@ static Char* mpfrToString(Char* str, mpfr_t* fp) {
 	return str;
 }
 
-static Bool ignoreFile(Char* desc) {
+static Bool ignoreFile(HChar* desc) {
 	if (!clo_ignoreLibraries) {
 		return False;
 	}
@@ -2420,8 +2420,8 @@ static void getIntroducedError(mpfr_t* introducedError, MeanValue* mv) {
 	}
 }
 
-static void getFileName(Char* name) {
-	Char tempName[256];
+static void getFileName(HChar* name) {
+	HChar tempName[256];
 	struct vg_stat st;
 	int i;
 	for (i = 1; i < 100; ++i) {
@@ -2442,7 +2442,7 @@ void fwrite_flush(void) {
     fwrite_pos = 0;
 }
 
-static void my_fwrite(Int fd, Char* buf, Int len) {
+static void my_fwrite(Int fd, const HChar* buf, Int len) {
     if (fwrite_fd != fd) {
 		fwrite_flush();
 		fwrite_fd = fd;
@@ -2540,19 +2540,19 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 		Char maxErrorStr[MPFR_BUFSIZE];
 		mpfrToStringShort(maxErrorStr, &(mv->max));
 
-		Char canceledAvg[10];
+		HChar canceledAvg[10];
 		if (mv->overflow) {
 			VG_(sprintf)(canceledAvg, "overflow");
 		} else {
 			VG_(sprintf)(canceledAvg, "%ld", mv->canceledSum / mv->count);
 		}
 
-		const HChar *filename;
-		VG_(get_filename)(origin, &filename);
+		const HChar *originFilename;
+		VG_(get_filename)(origin, &originFilename);
 
 		UInt linenum = -1;
 		Bool gotLine = VG_(get_linenum)(origin, &linenum);
-		Char linenumber[10];
+		HChar linenumber[10];
 		linenumber[0] = '\0';
 		if (gotLine) {
 			VG_(sprintf)(linenumber, ":%u", linenum);
@@ -2560,7 +2560,7 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 
 		VG_(sprintf)(formatBuf, "node: { title: \"0x%lX\" label: \"%s (%s%s)\" color: %d info1: \"%s (%'u)\" info2: \"avg: %s, max: %s\" "
 			"info3: \"canceled - avg: %s, max: %ld\" }\n",
-			origin, opStr, filename, linenumber, color, description, mv->count, meanErrorStr, maxErrorStr, canceledAvg, mv->canceledMax);
+			origin, opStr, originFilename, linenumber, color, description, mv->count, meanErrorStr, maxErrorStr, canceledAvg, mv->canceledMax);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	}
 
@@ -2628,7 +2628,7 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 	}
 }
 
-static Bool dumpGraph(Char* fileName, ULong addr, Bool conditional, Bool careVisited) {
+static Bool dumpGraph(HChar* fileName, ULong addr, Bool conditional, Bool careVisited) {
 	if (!clo_computeMeanValue) {
 		VG_(umsg)("DUMP GRAPH (%s): Mean error computation has to be active!\n", fileName);
 		return False;
@@ -2718,7 +2718,7 @@ static void printError(Char* varName, ULong addr, Bool conditional) {
 
 		mpfr_sub(diff, svalue->value, org, STD_RND);
 
-		Char typeName[7];
+		HChar typeName[7];
 		if (isFloat) {
 			VG_(strcpy)(typeName, "float");
 		} else {
@@ -2883,7 +2883,7 @@ static void writeShadowValue(Int file, ShadowValue* svalue, Int num) {
 	mpfr_sub(writeSvDiff, svalue->value, writeSvOrg, STD_RND);
 
 	Char mpfrBuf[MPFR_BUFSIZE];
-	Char typeName[7];
+	HChar typeName[7];
 	if (isFloat) {
 		VG_(strcpy)(typeName, "float");
 	} else {
@@ -2931,7 +2931,7 @@ static Bool areSvsEqual(ShadowValue* sv1, ShadowValue* sv2) {
 	return False;
 }
 
-static Int compareShadowValues(void* n1, void* n2) {
+static Int compareShadowValues(const void* n1, const void* n2) {
 	ShadowValue* sv1 = *(ShadowValue**)n1;
 	ShadowValue* sv2 = *(ShadowValue**)n2;
 	if (sv1->opCount < sv2->opCount) return 1;
@@ -2942,8 +2942,8 @@ static Int compareShadowValues(void* n1, void* n2) {
 }
 
 static void writeMemorySpecial(ShadowValue** memory, UInt n_memory) {
-	Char fname[256];
-	HChar* clientName = VG_(args_the_exename);
+	HChar fname[256];
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(fname, "%s_shadow_values_special", clientName);
 
 	getFileName(fname);
@@ -3020,8 +3020,8 @@ static void writeMemorySpecial(ShadowValue** memory, UInt n_memory) {
 }
 
 static void writeMemoryCanceled(ShadowValue** memory, UInt n_memory) {
-	Char fname[256];
-	HChar* clientName = VG_(args_the_exename);
+	HChar fname[256];
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(fname, "%s_shadow_values_canceled", clientName);
 
 	getFileName(fname);
@@ -3089,8 +3089,8 @@ static void writeMemoryCanceled(ShadowValue** memory, UInt n_memory) {
 }
 
 static void writeMemoryRelError(ShadowValue** memory, UInt n_memory) {
-	Char fname[256];
-	HChar* clientName = VG_(args_the_exename);
+	HChar fname[256];
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(fname, "%s_shadow_values_relative_error", clientName);
 
 	getFileName(fname);
@@ -3201,7 +3201,7 @@ static void endAnalysis(void) {
 	VG_(free)(memory);
 }
 
-static Int compareMVAddr(void* n1, void* n2) {
+static Int compareMVAddr(const void* n1, const void* n2) {
 	MeanValue* mv1 = *(MeanValue**)n1;
 	MeanValue* mv2 = *(MeanValue**)n2;
 	if (mv1->key < mv2->key) return -1;
@@ -3209,7 +3209,7 @@ static Int compareMVAddr(void* n1, void* n2) {
 	return 0;
 }
 
-static Int compareMVCanceled(void* n1, void* n2) {
+static Int compareMVCanceled(const void* n1, const void* n2) {
 	MeanValue* mv1 = *(MeanValue**)n1;
 	MeanValue* mv2 = *(MeanValue**)n2;
 	if (mv1->cancellationBadnessMax < mv2->cancellationBadnessMax) return 1;
@@ -3219,7 +3219,7 @@ static Int compareMVCanceled(void* n1, void* n2) {
 	return 0;
 }
 
-static Int compareMVIntroError(void* n1, void* n2) {
+static Int compareMVIntroError(const void* n1, const void* n2) {
 	MeanValue* mv1 = *(MeanValue**)n1;
 	MeanValue* mv2 = *(MeanValue**)n2;
 
@@ -3232,7 +3232,7 @@ static Int compareMVIntroError(void* n1, void* n2) {
 	return 0;
 }
 
-static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool forCanceled) {
+static void writeMeanValues(HChar* fname, Int (*cmpFunc) (const void*, const void*), Bool forCanceled) {
 	if (!clo_computeMeanValue) {
 		return;
 	}
@@ -3348,7 +3348,7 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 	VG_(free)(values);
 }
 
-static Int compareStageReports(void* n1, void* n2) {
+static Int compareStageReports(const void* n1, const void* n2) {
 	StageReport* sr1 = *(StageReport**)n1;
 	StageReport* sr2 = *(StageReport**)n2;
 	if (sr1->count < sr2->count) return 1;
@@ -3365,7 +3365,7 @@ static Int compareStageReports(void* n1, void* n2) {
 	return 0;
 }
 
-static void writeStageReports(Char* fname) {
+static void writeStageReports(HChar* fname) {
 	Bool writeReports = False;
 	Int i;
 	for (i = 0; i < MAX_STAGES; i++) {
@@ -3447,7 +3447,7 @@ static void writeStageReports(Char* fname) {
 static void fd_fini(Int exitcode) {
 	endAnalysis();
 
-	HChar* clientName = VG_(args_the_exename);
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(filename, "%s_mean_errors_addr", clientName);
 	writeMeanValues(filename, &compareMVAddr, False);
 	if (clo_bad_cancellations) {
@@ -3483,10 +3483,10 @@ static Bool fd_handle_client_request(ThreadId tid, UWord* arg, UWord* ret) {
 			printError((Char*)arg[1], arg[2], True);
 			break;
 		case VG_USERREQ__DUMP_ERROR_GRAPH:
-			dumpGraph((Char*)arg[1], arg[2], False, False);
+			dumpGraph((HChar*)arg[1], arg[2], False, False);
 			break;
 		case VG_USERREQ__COND_DUMP_ERROR_GRAPH:
-			dumpGraph((Char*)arg[1], arg[2], True, False);
+			dumpGraph((HChar*)arg[1], arg[2], True, False);
 			break;
 		case VG_USERREQ__BEGIN_STAGE:
 			stageStart((Int)arg[1]);
@@ -3603,7 +3603,7 @@ static void fd_pre_clo_init(void) {
                                  fd_instrument,
                                  fd_fini);
 
-	VG_(needs_command_line_options)(fd_process_cmd_line_option,
+	VG_(needs_command_line_options)(fd_process_cmd_line_options,
 									fd_print_usage,
 									fd_print_debug_usage);
 
