@@ -112,3 +112,8 @@ Running on valgrind
 --19945-- OPTIMIZATION - PUT:   total 16,367, ignored: 36
 --19945-- OPTIMIZATION - LOAD:  total 2,681, ignored: 0
 ----
+
+=== License
+
+FpDebug is Open Source software released under the link:https://www.gnu.org/licenses/gpl-2.0.html[GNU General Public License, version 2].
+
