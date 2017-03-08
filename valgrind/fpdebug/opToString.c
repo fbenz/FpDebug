@@ -31,13 +31,13 @@
 
 static HChar* opStr = NULL;
 
-static void storeOpStr(HChar* str) {
+static void storeOpStr(const HChar* str) {
    opStr = VG_(realloc)("storeOpStr", opStr, sizeof(HChar) * (VG_(strlen)(str) + 1));
    VG_(strcpy)(opStr, str);
 }
 
 static void opToStr(IROp op) {
-   HChar* str = NULL;
+   const HChar* str = NULL;
    IROp   base;
    switch (op) {
       case Iop_Add8 ... Iop_Add64:

@@ -184,7 +184,7 @@ static StageReport*		stageReports[MAX_STAGES];
 static HChar 			formatBuf[FORMATBUF_SIZE];
 static InlIPCursor* description = NULL;
 static HChar 			filename[FILENAME_SIZE];
-static Char 			fwrite_buf[FWRITE_BUFSIZE];
+static HChar 			fwrite_buf[FWRITE_BUFSIZE];
 
 static mpfr_t meanOrg, meanRelError;
 static mpfr_t stageOrg, stageDiff, stageRelError;
@@ -197,10 +197,10 @@ static mpfr_t cancelTemp;
 static mpfr_t arg1tmpX, arg2tmpX, arg3tmpX;
 
 
-static Char* mpfrToStringShort(Char* str, mpfr_t* fp) {
+static void mpfrToStringShort(HChar* str, mpfr_t* fp) {
 	if (mpfr_cmp_ui(*fp, 0) == 0) {
 		str[0] = '0'; str[1] = '\0';
-		return str;
+		return;
 	}
 
 	Int sgn = mpfr_sgn(*fp);
@@ -210,7 +210,7 @@ static Char* mpfrToStringShort(Char* str, mpfr_t* fp) {
 		str[0] = '-'; str[1] = '\0';
 	}
 
-	Char mpfr_str[4]; /* digits + 1 */
+	HChar mpfr_str[4]; /* digits + 1 */
 	mpfr_exp_t exp;
 	/* digits_base10 = log10 ( 2^(significant bits) ) */
 	mpfr_get_str(mpfr_str, &exp, /* base */ 10, 3, *fp, STD_RND);
@@ -225,13 +225,12 @@ static Char* mpfrToStringShort(Char* str, mpfr_t* fp) {
 		str[2] = '.';
 	}
 
-	Char exp_str[10];
+	HChar exp_str[10];
 	VG_(sprintf)(exp_str, " * 10^%ld", exp);
 	VG_(strcat)(str, exp_str);
-	return str;
 }
 
-static Char* mpfrToString(Char* str, mpfr_t* fp) {
+static void mpfrToString(HChar* str, mpfr_t* fp) {
 	Int sgn = mpfr_sgn(*fp);
 	if (sgn >= 0) {
 		str[0] = ' '; str[1] = '0'; str[2] = '\0';
@@ -239,7 +238,7 @@ static Char* mpfrToString(Char* str, mpfr_t* fp) {
 		str[0] = '-'; str[1] = '\0';
 	}
 
-	Char mpfr_str[60]; /* digits + 1 */
+	HChar mpfr_str[60]; /* digits + 1 */
 	mpfr_exp_t exp;
 	/* digits_base10 = log10 ( 2^(significant bits) ) */
 	mpfr_get_str(mpfr_str, &exp, /* base */ 10, /* digits, float: 7, double: 15 */ 15, *fp, STD_RND);
@@ -254,16 +253,15 @@ static Char* mpfrToString(Char* str, mpfr_t* fp) {
 		str[2] = '.';
 	}
 
-	Char exp_str[50];
+	HChar exp_str[50];
 	VG_(sprintf)(exp_str, " * 10^%ld", exp);
 	VG_(strcat)(str, exp_str);
 
 	mpfr_prec_t pre_min = mpfr_min_prec(*fp);
 	mpfr_prec_t pre = mpfr_get_prec(*fp);
-	Char pre_str[50];
+	HChar pre_str[50];
 	VG_(sprintf)(pre_str, ", %ld/%ld bit", pre_min, pre);
 	VG_(strcat)(str, pre_str);
-	return str;
 }
 
 static Bool ignoreFile(HChar* desc) {
@@ -271,7 +269,7 @@ static Bool ignoreFile(HChar* desc) {
 		return False;
 	}
 	/* simple patern matching - only for one short pattern */
-	Char* pattern = ".so";
+	const Char* pattern = ".so";
 	Int pi = 0;
 	Int i = 0;
 	while (desc[i] != '\0' && i < 256) {
@@ -516,7 +514,7 @@ static void stageEnd(Int num) {
 			mpfr_sub(stageDiff, mate->relError, next->relError, STD_RND);
 			mpfr_abs(stageDiff, stageDiff, STD_RND);
 
-			Char mpfrBuf[MPFR_BUFSIZE];
+			HChar mpfrBuf[MPFR_BUFSIZE];
 			if (sl) {
 				if (mpfr_cmp(stageDiff, sl->limit) > 0) {
 					mpfrToString(mpfrBuf, &(sl->limit));
@@ -1800,7 +1798,7 @@ IRSB* fd_instrument ( VgCallbackClosure* closure,
    	IRTypeEnv* 	tyenv = sbIn->tyenv;
 	IRExpr* 	expr;
 	/* address of current client instruction */
-	Addr		cia = 0, dst;
+	Addr		cia = 0;
 
 	if (gWordTy != hWordTy) {
 		/* This case is not supported yet. */
@@ -1821,18 +1819,12 @@ IRSB* fd_instrument ( VgCallbackClosure* closure,
 	}
 
 	/* perform optimizations for each superblock */
-
-	Bool sbInstrNeeded = False;
 	if (maxTemps < tyenv->types_used) {
 		maxTemps = tyenv->types_used;
 	}
 
 	Int j;
 
-	Bool impReg[MAX_REGISTERS];
-	for (j = 0; j < MAX_REGISTERS; j++) {
-		impReg[j] = True;
-	}
 	Int impTmp[tyenv->types_used];
 	for (j = 0; j < tyenv->types_used; j++) {
 		impTmp[j] = 0;
@@ -1845,8 +1837,6 @@ IRSB* fd_instrument ( VgCallbackClosure* closure,
 
 		switch (st->tag) {
 			case Ist_Put:
-				impReg[st->Ist.Put.offset] = False;
-
 				if (st->Ist.Put.data->tag == Iex_RdTmp) {
 					impTmp[st->Ist.Put.data->Iex.RdTmp.tmp] = 1;
 				}
@@ -1861,7 +1851,6 @@ IRSB* fd_instrument ( VgCallbackClosure* closure,
 
 		        switch (expr->tag) {
 					case Iex_Get:
-						impReg[expr->Iex.Get.offset] = True;
 						break;
 					case Iex_Unop:
 						switch (expr->Iex.Unop.op) {
@@ -2535,9 +2524,9 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 		mpfr_div_ui(dumpGraphMeanError, mv->sum, mv->count, STD_RND);
 
 		opToStr(mv->op);
-		Char meanErrorStr[MPFR_BUFSIZE];
+		HChar meanErrorStr[MPFR_BUFSIZE];
 		mpfrToStringShort(meanErrorStr, &dumpGraphMeanError);
-		Char maxErrorStr[MPFR_BUFSIZE];
+		HChar maxErrorStr[MPFR_BUFSIZE];
 		mpfrToStringShort(maxErrorStr, &(mv->max));
 
 		HChar canceledAvg[10];
@@ -2571,7 +2560,7 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 
 		getIntroducedError(&dumpGraphDiff, mv);
 
-		Char diffStr[30];
+		HChar diffStr[30];
 		mpfrToStringShort(&diffStr, &dumpGraphDiff);
 
 		VG_(sprintf)(formatBuf, "edge: { sourcename: \"0x%lX\" targetname: \"0x%lX\" label: \"%s\" class: 1 color : %d }\n", origin, oldAddr, diffStr, edgeColor);
@@ -2726,7 +2715,7 @@ static void printError(Char* varName, ULong addr, Bool conditional) {
 		}
 
 		VG_(umsg)("(%s) %s PRINT ERROR OF: 0x%lX\n", typeName, varName, addr);
-		Char mpfrBuf[MPFR_BUFSIZE];
+		HChar mpfrBuf[MPFR_BUFSIZE];
 		mpfrToString(mpfrBuf, &org);
 		VG_(umsg)("(%s) %s ORIGINAL:         %s\n", typeName, varName, mpfrBuf);
 		mpfrToString(mpfrBuf, &(svalue->value));
@@ -2882,7 +2871,7 @@ static void writeShadowValue(Int file, ShadowValue* svalue, Int num) {
 
 	mpfr_sub(writeSvDiff, svalue->value, writeSvOrg, STD_RND);
 
-	Char mpfrBuf[MPFR_BUFSIZE];
+	HChar mpfrBuf[MPFR_BUFSIZE];
 	HChar typeName[7];
 	if (isFloat) {
 		VG_(strcpy)(typeName, "float");
@@ -3281,9 +3270,9 @@ static void writeMeanValues(HChar* fname, Int (*cmpFunc) (const void*, const voi
 		mpfr_div_ui(meanError, values[i]->sum, values[i]->count, STD_RND);
 
 		opToStr(values[i]->op);
-		Char meanErrorStr[MPFR_BUFSIZE];
+		HChar meanErrorStr[MPFR_BUFSIZE];
 		mpfrToString(meanErrorStr, &meanError);
-		Char maxErrorStr[MPFR_BUFSIZE];
+		HChar maxErrorStr[MPFR_BUFSIZE];
 		mpfrToString(maxErrorStr, &(values[i]->max));
 
 		VG_(sprintf)(formatBuf, "%s %s (%'u)\n", description, opStr, values[i]->count);
@@ -3312,7 +3301,7 @@ static void writeMeanValues(HChar* fname, Int (*cmpFunc) (const void*, const voi
 
 		getIntroducedError(&introducedError, values[i]);
 		if (mpfr_cmp_ui(introducedError, 0) > 0) {
-			Char introErrorStr[MPFR_BUFSIZE];
+			HChar introErrorStr[MPFR_BUFSIZE];
 			mpfrToString(introErrorStr, &introducedError);
 			VG_(sprintf)(formatBuf, "    introduced error (max path): %s\n", introErrorStr);
 		} else {
