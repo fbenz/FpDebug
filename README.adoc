@@ -128,3 +128,7 @@ DEFAULT_SUPP="glibc-2.X.supp ${DEFAULT_SUPP}"
 DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
 DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
 ;;"
+
+=== License
+
+FpDebug is Open Source software released under the link:https://www.gnu.org/licenses/gpl-2.0.html[GNU General Public License, version 2].
