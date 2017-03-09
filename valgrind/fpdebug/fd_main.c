@@ -2558,7 +2558,7 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 		getIntroducedError(&dumpGraphDiff, mv);
 
 		HChar diffStr[30];
-		mpfrToStringShort(&diffStr, &dumpGraphDiff);
+		mpfrToStringShort(diffStr, &dumpGraphDiff);
 
 		VG_(sprintf)(formatBuf, "edge: { sourcename: \"0x%lX\" targetname: \"0x%lX\" label: \"%s\" class: 1 color : %d }\n", origin, oldAddr, diffStr, edgeColor);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
