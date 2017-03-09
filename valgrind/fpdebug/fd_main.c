@@ -182,7 +182,6 @@ static Stage* 			stages[MAX_STAGES];
 static StageReport*		stageReports[MAX_STAGES];
 
 static HChar 			formatBuf[FORMATBUF_SIZE];
-static InlIPCursor* description = NULL;
 static HChar 			filename[FILENAME_SIZE];
 static HChar 			fwrite_buf[FWRITE_BUFSIZE];
 
@@ -264,12 +263,12 @@ static void mpfrToString(HChar* str, mpfr_t* fp) {
 	VG_(strcat)(str, pre_str);
 }
 
-static Bool ignoreFile(HChar* desc) {
+static Bool ignoreFile(const HChar* desc) {
 	if (!clo_ignoreLibraries) {
 		return False;
 	}
 	/* simple patern matching - only for one short pattern */
-	const Char* pattern = ".so";
+	const HChar* pattern = ".so";
 	Int pi = 0;
 	Int i = 0;
 	while (desc[i] != '\0' && i < 256) {
@@ -288,7 +287,7 @@ static Bool isInLibrary(Addr64 addr) {
 	DebugInfo* dinfo = VG_(find_DebugInfo)((Addr)addr);
 	if (!dinfo) return False; /* be save if not sure */
 
-	const UChar* soname = VG_(DebugInfo_get_soname)(dinfo);
+	const HChar* soname = VG_(DebugInfo_get_soname)(dinfo);
 	tl_assert(soname);
 	if (0) VG_(printf)("%s\n", soname);
 
@@ -2493,8 +2492,8 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 		cycle = True;
 	} else {
 		/* create node */
-		VG_(describe_IP)(origin, description);
-		if (ignoreFile(description)) {
+		const HChar* originIp = VG_(describe_IP)(origin, NULL);
+		if (ignoreFile(originIp)) {
 			inLibrary = True;
 		}
 
@@ -2549,7 +2548,7 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 
 		VG_(sprintf)(formatBuf, "node: { title: \"0x%lX\" label: \"%s (%s%s)\" color: %d info1: \"%s (%'u)\" info2: \"avg: %s, max: %s\" "
 			"info3: \"canceled - avg: %s, max: %ld\" }\n",
-			origin, opStr, originFilename, linenumber, color, description, mv->count, meanErrorStr, maxErrorStr, canceledAvg, mv->canceledMax);
+			origin, opStr, originFilename, linenumber, color, originIp, mv->count, meanErrorStr, maxErrorStr, canceledAvg, mv->canceledMax);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	}
 
@@ -2595,22 +2594,22 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 			if (red > 120) red = 120;
 			Int green = red + 100;
 
-			VG_(describe_IP)(mv->arg1, description);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg1Ip = VG_(describe_IP)(mv->arg1, NULL);
+			if (!inLibrary || !ignoreFile(arg1Ip)) {
 				writeOriginGraph(file, origin, mv->arg1, 1, ++level, (leftErrGreater ? red : green), careVisited);
 			}
-			VG_(describe_IP)(mv->arg2, description);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg2Ip = VG_(describe_IP)(mv->arg2, NULL);
+			if (!inLibrary || !ignoreFile(arg2Ip)) {
 				writeOriginGraph(file, origin, mv->arg2, 2, level, (leftErrGreater ? green : red), careVisited);
 			}
 		} else if (mv->arg1 != 0) {
-			VG_(describe_IP)(mv->arg1, description);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg1Ip = VG_(describe_IP)(mv->arg1, NULL);
+			if (!inLibrary || !ignoreFile(arg1Ip)) {
 				writeOriginGraph(file, origin, mv->arg1, 1, ++level, 1, careVisited);
 			}
 		} else if (mv->arg2 != 0) {
-			VG_(describe_IP)(mv->arg2, description);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg2Ip = VG_(describe_IP)(mv->arg2, NULL);
+			if (!inLibrary || !ignoreFile(arg2Ip)) {
 				writeOriginGraph(file, origin, mv->arg2, 2, ++level, 1, careVisited);
 			}
 		}
@@ -2633,8 +2632,8 @@ static Bool dumpGraph(HChar* fileName, ULong addr, Bool conditional, Bool careVi
 			}
 		}
 
-		VG_(describe_IP)(svalue->origin, description);
-		if (ignoreFile(description)) {
+		const HChar* originIp = VG_(describe_IP)(svalue->origin, NULL);
+		if (ignoreFile(originIp)) {
 			return False;
 		}
 
@@ -2726,12 +2725,12 @@ static void printError(Char* varName, ULong addr, Bool conditional) {
 		VG_(umsg)("(%s) %s RELATIVE ERROR:   %s\n", typeName, varName, mpfrBuf);
 		VG_(umsg)("(%s) %s CANCELED BITS:     %lld\n", typeName, varName, svalue->canceled);
 
-		VG_(describe_IP)(svalue->origin, description);
-		VG_(umsg)("(%s) %s Last operation: %s\n", typeName, varName, description);
+		const HChar* lastOperation = VG_(describe_IP)(svalue->origin, NULL);
+		VG_(umsg)("(%s) %s Last operation: %s\n", typeName, varName, lastOperation);
 
 		if (svalue->canceled > 0 && svalue->cancelOrigin > 0) {
-			VG_(describe_IP)(svalue->cancelOrigin, description);
-			VG_(umsg)("(%s) %s Cancellation origin: %s\n", typeName, varName, description);
+			const HChar* cancellationOrigin = VG_(describe_IP)(svalue->cancelOrigin, NULL);
+			VG_(umsg)("(%s) %s Cancellation origin: %s\n", typeName, varName, cancellationOrigin);
 		}
 
 		VG_(umsg)("(%s) %s Operation count (max path): %'lu\n", typeName, varName, svalue->opCount);
@@ -2897,13 +2896,13 @@ static void writeShadowValue(Int file, ShadowValue* svalue, Int num) {
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 
 	if (svalue->canceled > 0 && svalue->cancelOrigin > 0) {
-		VG_(describe_IP)(svalue->cancelOrigin, description);
-		VG_(sprintf)(formatBuf, "    origin of maximum cancellation: %s\n", description);
+		const HChar* cancellationOrigin = VG_(describe_IP)(svalue->cancelOrigin, NULL);
+		VG_(sprintf)(formatBuf, "    origin of maximum cancellation: %s\n", cancellationOrigin);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	}
 
-	VG_(describe_IP)(svalue->origin, description);
-	VG_(sprintf)(formatBuf, "    last operation: %s\n", description);
+	const HChar* lastOperation = VG_(describe_IP)(svalue->origin, NULL);
+	VG_(sprintf)(formatBuf, "    last operation: %s\n", lastOperation);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	VG_(sprintf)(formatBuf, "    operation count (max path): %'lu\n", svalue->opCount);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
@@ -2968,8 +2967,8 @@ static void writeMemorySpecial(ShadowValue** memory, UInt n_memory) {
 			specialFps++;
 
 			if (clo_ignoreLibraries) {
-				VG_(describe_IP)(memory[i]->origin, description);
-				if (ignoreFile(description)) {
+				const HChar* originIp = VG_(describe_IP)(memory[i]->origin, NULL);
+				if (ignoreFile(originIp)) {
 					skippedLibrary++;
 					continue;
 				}
@@ -3037,8 +3036,8 @@ static void writeMemoryCanceled(ShadowValue** memory, UInt n_memory) {
 			fpsWithError++;
 
 			if (clo_ignoreLibraries) {
-				VG_(describe_IP)(memory[i]->origin, description);
-				if (ignoreFile(description)) {
+				const HChar* originIp = VG_(describe_IP)(memory[i]->origin, NULL);
+				if (ignoreFile(originIp)) {
 					skippedLibrary++;
 					continue;
 				}
@@ -3119,8 +3118,8 @@ static void writeMemoryRelError(ShadowValue** memory, UInt n_memory) {
 				fpsWithError++;
 
 				if (clo_ignoreLibraries) {
-					VG_(describe_IP)(memory[i]->origin, description);
-					if (ignoreFile(description)) {
+					const HChar* originIp = VG_(describe_IP)(memory[i]->origin, NULL);
+					if (ignoreFile(originIp)) {
 						skippedLibrary++;
 						continue;
 					}
@@ -3256,8 +3255,8 @@ static void writeMeanValues(HChar* fname, Int (*cmpFunc) (const void*, const voi
 			continue;
 		}
 
-		VG_(describe_IP)(values[i]->key, description);
-		if (ignoreFile(description)) {
+		const HChar* originIp = VG_(describe_IP)(values[i]->key, NULL);
+		if (ignoreFile(originIp)) {
 			skippedLibrary++;
 			continue;
 		}
@@ -3275,7 +3274,7 @@ static void writeMeanValues(HChar* fname, Int (*cmpFunc) (const void*, const voi
 		HChar maxErrorStr[MPFR_BUFSIZE];
 		mpfrToString(maxErrorStr, &(values[i]->max));
 
-		VG_(sprintf)(formatBuf, "%s %s (%'u)\n", description, opStr, values[i]->count);
+		VG_(sprintf)(formatBuf, "%s %s (%'u)\n", originIp, opStr, values[i]->count);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 		VG_(sprintf)(formatBuf, "    avg error: %s\n", meanErrorStr);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
