@@ -160,10 +160,10 @@ static int abs(int x) {
 	}
 }
 
-/* hash tables for maping the addresses of the original floating-point values
-   to the shadow values */
-static VgHashTable* globalMemory 	= NULL;
-static VgHashTable* meanValues 		= NULL;
+/* globalMemory is the hash table for maping the addresses of the
+   original floating-point values to the shadow values. */
+static VgHashTable* globalMemory 	= NULL; /* Hash table with ShadowValue* */
+static VgHashTable* meanValues 		= NULL; /* Hash table with MeanValue* */
 static OSet* originAddrSet 			= NULL;
 static OSet* unsupportedOps			= NULL;
 
@@ -179,7 +179,7 @@ static ShadowValue* 	localTemps[MAX_TEMPS];
 static ShadowTmp* 		sTmp[TMP_COUNT];
 static ShadowConst* 	sConst[CONST_COUNT];
 static Stage* 			stages[MAX_STAGES];
-static StageReport*		stageReports[MAX_STAGES];
+static VgHashTable*	stageReports[MAX_STAGES]; /* Hash table for each stage with StageReport* */
 
 static HChar 			formatBuf[FORMATBUF_SIZE];
 static HChar 			filename[FILENAME_SIZE];
@@ -490,8 +490,6 @@ static void stageEnd(Int num) {
 	tl_assert(stages[num]->active);
 
 	Int mateCount = -1;
-	Int newNodes = 0;
-	Int oldNodes = 0;
 
 	if (stages[num]->newVals && stages[num]->oldVals) {
 		mateCount = 0;
@@ -3179,7 +3177,7 @@ static void writeMemoryRelError(ShadowValue** memory, UInt n_memory) {
 
 static void endAnalysis(void) {
 	UInt n_memory = 0;
-	ShadowValue** memory = VG_(HT_to_array)(globalMemory, &n_memory);
+	ShadowValue** memory = (ShadowValue**) VG_(HT_to_array)(globalMemory, &n_memory);
 	VG_(ssort)(memory, n_memory, sizeof(VgHashNode*), compareShadowValues);
 
 	writeMemoryRelError(memory, n_memory);
@@ -3235,7 +3233,7 @@ static void writeMeanValues(HChar* fname, Int (*cmpFunc) (const void*, const voi
 	writeWarning(file);
 
 	UInt n_values = 0;
-	MeanValue** values = VG_(HT_to_array)(meanValues, &n_values);
+	MeanValue** values = (MeanValue**) VG_(HT_to_array)(meanValues, &n_values);
 	VG_(ssort)(values, n_values, sizeof(VgHashNode*), cmpFunc);
 
 	mpfr_t meanError, maxError, introducedError, err1, err2;
@@ -3383,7 +3381,7 @@ static void writeStageReports(HChar* fname) {
 		numStages++;
 
 		UInt n_reports = 0;
-		StageReport** reports = VG_(HT_to_array)(stageReports[i], &n_reports);
+		StageReport** reports = (StageReport**) VG_(HT_to_array)(stageReports[i], &n_reports);
 		VG_(ssort)(reports, n_reports, sizeof(VgHashNode*), compareStageReports);
 		totalReports += n_reports;
 

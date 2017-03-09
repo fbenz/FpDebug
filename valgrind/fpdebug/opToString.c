@@ -331,8 +331,6 @@ static void opToStr(IROp op) {
       case Iop_QDMulHi32Sx2: storeOpStr("QDMulHi32Sx2"); return;
       case Iop_QRDMulHi16Sx4: storeOpStr("QRDMulHi16Sx4"); return;
       case Iop_QRDMulHi32Sx2: storeOpStr("QRDMulHi32Sx2"); return;
-      //case Iop_QDMulLong16Sx4: storeOpStr("QDMulLong16Sx4"); return;
-      //case Iop_QDMulLong32Sx2: storeOpStr("QDMulLong32Sx2"); return;
       case Iop_Avg8Ux8: storeOpStr("Avg8Ux8"); return;
       case Iop_Avg16Ux4: storeOpStr("Avg16Ux4"); return;
       case Iop_Max8Sx8: storeOpStr("Max8Sx8"); return;
