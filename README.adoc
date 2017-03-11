@@ -95,7 +95,7 @@ gcc test_1.c -O0 -g -o test_1.out
 ==7041== FpDebug-0.1, Floating-point arithmetic debugger
 ==7041== Copyright (C) 2010-2011 by Florian Benz.
 ==7041== Using Valgrind-3.7.0 and LibVEX; rerun with -h for copyright info
-==7041== Command: /home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out
+==7041== Command: valgrind/fpdebug/examples/test_1.out
 ==7041==
 ==7041== precision=120
 ==7041== mean-error=yes
@@ -118,13 +118,13 @@ Running on valgrind
 ==7041== (float) sum Operation count (max path): 5
 ==7041== DUMP GRAPH (test_1_sum.vcg): successful
 ==7041==
-==7041== DUMP GRAPH (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_1_0.vcg): successful
-==7041== SHADOW VALUES (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_shadow_values_relative_error_1): successful
-==7041== SHADOW VALUES (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_shadow_values_canceled_1): successful
-==7041== SHADOW VALUES (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_shadow_values_special_1): successful
-==7041== MEAN ERRORS (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_mean_errors_addr_1): successful
-==7041== MEAN ERRORS (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_mean_errors_canceled_1): successful
-==7041== MEAN ERRORS (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_mean_errors_intro_1): successful
+==7041== DUMP GRAPH (valgrind/fpdebug/examples/test_1.out_1_0.vcg): successful
+==7041== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_relative_error_1): successful
+==7041== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_canceled_1): successful
+==7041== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_special_1): successful
+==7041== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_addr_1): successful
+==7041== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_canceled_1): successful
+==7041== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_intro_1): successful
 ----
 
 === License
