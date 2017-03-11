@@ -38,16 +38,9 @@ sudo docker run -it fpdebug /bin/bash
 
 == Build from source
 
-NOTE: The version on master runs with Valgrind 3.7 and might
-not work on more recent systems than Ubuntu 12.04.
-However, a version for Valgrind 3.12 can be found here:
-https://github.com/fbenz/FpDebug/pull/2 .
-But so far it has only been tested on small examples.
-Tests have been performed on Ubuntu 16.04 and Ubuntu 16.10.
-
 NOTE: Only 64bit systems are supported.
 
-The following installation instructions are for Ubuntu 12.04.5 LTS (64bit).
+The following installation instructions are for Ubuntu 16.10 (64bit).
 The instructions should be similar for most other Linux systems.
 
 [source,bash]
@@ -104,41 +97,51 @@ gcc test_1.c -O0 -g -o test_1.out
 [source,bash]
 .FpDebug output
 ----
-==7041== FpDebug-0.1, Floating-point arithmetic debugger
-==7041== Copyright (C) 2010-2011 by Florian Benz.
-==7041== Using Valgrind-3.7.0 and LibVEX; rerun with -h for copyright info
-==7041== Command: valgrind/fpdebug/examples/test_1.out
-==7041==
-==7041== precision=120
-==7041== mean-error=yes
-==7041== ignore-libraries=no
-==7041== ignore-accurate=yes
-==7041== sim-original=no
-==7041== analyze-all=yes
-==7041== bad-cancellations=yes
-==7041== ignore-end=no
+==15351== FpDebug-0.2, Floating-point arithmetic debugger
+==15351== Copyright (C) 2010-2017 by Florian Benz.
+==15351== Using Valgrind-3.12.0 and LibVEX; rerun with -h for copyright info
+==15351== Command: valgrind/fpdebug/examples/test_1.out
+==15351== 
+==15351== precision=120
+==15351== mean-error=yes
+==15351== ignore-libraries=no
+==15351== ignore-accurate=yes
+==15351== sim-original=no
+==15351== analyze-all=yes
+==15351== bad-cancellations=yes
+==15351== ignore-end=no
 Test program: machine epsilon, client request
 Sum: 1.0000000e+00
 Running on valgrind
-==7041== (float) sum PRINT ERROR OF: 0x7FF0000F4
-==7041== (float) sum ORIGINAL:          1.00000000000000 * 10^0, 1/120 bit
-==7041== (float) sum SHADOW VALUE:      1.00000025000000 * 10^0, 49/120 bit
-==7041== (float) sum ABSOLUTE ERROR:    2.50000002921524 * 10^-7, 27/120 bit
-==7041== (float) sum RELATIVE ERROR:    2.49999940421539 * 10^-7, 120/120 bit
-==7041== (float) sum CANCELED BITS:     0
-==7041== (float) sum Last operation: 0x4007AD: main (test_1.c:14)
-==7041== (float) sum Operation count (max path): 5
-==7041== DUMP GRAPH (test_1_sum.vcg): successful
-==7041==
-==7041== DUMP GRAPH (valgrind/fpdebug/examples/test_1.out_1_0.vcg): successful
-==7041== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_relative_error_1): successful
-==7041== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_canceled_1): successful
-==7041== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_special_1): successful
-==7041== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_addr_1): successful
-==7041== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_canceled_1): successful
-==7041== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_intro_1): successful
+==15351== (float) sum PRINT ERROR OF: 0xFFEFFF60C
+==15351== (float) sum ORIGINAL:          1.00000000000000 * 10^0, 1/120 bit
+==15351== (float) sum SHADOW VALUE:      1.00000025000000 * 10^0, 49/120 bit
+==15351== (float) sum ABSOLUTE ERROR:    2.50000002921524 * 10^-7, 27/120 bit
+==15351== (float) sum RELATIVE ERROR:    2.49999940421539 * 10^-7, 120/120 bit
+==15351== (float) sum CANCELED BITS:     0
+==15351== (float) sum Last operation: 0x108A19: main (test_1.c:14)
+==15351== (float) sum Operation count (max path): 5
+==15351== DUMP GRAPH (test_1_sum.vcg): successful
+==15351== 
+==15351== DUMP GRAPH (valgrind/fpdebug/examples/test_1.out_1_0.vcg): successful
+==15351== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_relative_error_8): successful
+==15351== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_canceled_8): successful
+==15351== SHADOW VALUES (valgrind/fpdebug/examples/test_1.out_shadow_values_special_8): successful
+==15351== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_addr_8): successful
+==15351== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_canceled_8): successful
+==15351== MEAN ERRORS (valgrind/fpdebug/examples/test_1.out_mean_errors_intro_8): successful
+==15351== DEBUG - Client exited with code: 0
+--15351-- DEBUG - SBs: 1,888, executed: 31,743, instr: 66,328
+--15351-- DEBUG - ShadowValues (frees/mallocs): 0/14, diff: 14
+--15351-- DEBUG - Floating-point operations: 5
+--15351-- DEBUG - Max temps: 396
+--15351-- OPTIMIZATION - GET:   total 4,456, ignored: 181
+--15351-- OPTIMIZATION - STORE: total 1,881, ignored: 0
+--15351-- OPTIMIZATION - PUT:   total 16,367, ignored: 36
+--15351-- OPTIMIZATION - LOAD:  total 2,681, ignored: 0
 ----
 
 === License
 
 FpDebug is Open Source software released under the link:https://www.gnu.org/licenses/gpl-2.0.html[GNU General Public License, version 2].
+

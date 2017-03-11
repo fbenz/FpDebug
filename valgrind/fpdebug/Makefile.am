@@ -1,6 +1,24 @@
 include $(top_srcdir)/Makefile.tool.am
 
-EXTRA_DIST = docs/fd-manual.xml
+SUBDIRS = .
+
+AM_CFLAGS_BASE +=   -I<GMP_INSTALL_DIR>/include/ \
+                    -I<MPFR_INSTALL_DIR>/include/
+
+TOOL_LDADD_COMMON +=    -Wl,-rpath \
+                        -Wl,<GMP_INSTALL_DIR>/lib/libgmp.a \
+                        -Wl,<MPFR_INSTALL_DIR>/lib/libmpfr.a \
+                        -Wl,<GMP_INSTALL_DIR>/lib/libgmp.a
+
+#----------------------------------------------------------------------------
+# Headers
+#----------------------------------------------------------------------------
+
+pkginclude_HEADERS = \
+	fpdebug.h
+
+noinst_HEADERS = \
+	fd_include.h
 
 #----------------------------------------------------------------------------
 # fpdebug-<platform>

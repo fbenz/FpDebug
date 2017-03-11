@@ -7,7 +7,7 @@
    This file is part of FpDebug, a heavyweight Valgrind tool for
    detecting floating-point accuracy problems.
 
-   Copyright (C) 2010-2011 Florian Benz 
+   Copyright (C) 2010-2017 Florian Benz
       florianbenz1@gmail.com
 
    This program is free software; you can redistribute it and/or
@@ -28,7 +28,7 @@
    The GNU General Public License is contained in the file COPYING.
 */
 
-/* 
+/*
    The first function called by Valgrind is fd_pre_clo_init.
 
    For each super block (similar to a basic block) Valgrind
@@ -43,7 +43,7 @@
    are added in instrumentBinOp. Bascially a call to processBinOp
    is added. So each time the client program performs a binary
    floating-point operation, processBinOp is called.
-*/ 
+*/
 
 #include "pub_tool_basics.h"
 #include "pub_tool_tooliface.h"
@@ -87,7 +87,6 @@
 
 #define MPFR_BUFSIZE						100
 #define FORMATBUF_SIZE						256
-#define DESCRIPTION_SIZE					256
 #define FILENAME_SIZE						256
 #define FWRITE_BUFSIZE 						32000
 #define FWRITE_THROUGH 						10000
@@ -123,7 +122,7 @@ static UInt putCount 						= 0;
 static UInt putsIgnored 					= 0;
 static UInt maxTemps 						= 0;
 
-static Bool fd_process_cmd_line_option(Char* arg) {
+static Bool fd_process_cmd_line_options(const HChar* arg) {
 	if VG_BINT_CLO(arg, "--precision", clo_precision, MPFR_PREC_MIN, MPFR_PREC_MAX) {}
 	else if VG_BOOL_CLO(arg, "--mean-error", clo_computeMeanValue) {}
 	else if VG_BOOL_CLO(arg, "--ignore-libraries", clo_ignoreLibraries) {}
@@ -131,13 +130,13 @@ static Bool fd_process_cmd_line_option(Char* arg) {
 	else if VG_BOOL_CLO(arg, "--sim-original", clo_simulateOriginal) {}
 	else if VG_BOOL_CLO(arg, "--analyze-all", clo_analyze) {}
     else if VG_BOOL_CLO(arg, "--ignore-end", clo_ignore_end) {}
-	else 
+	else
 		return False;
-   
+
 	return True;
 }
 
-static void fd_print_usage(void) {  
+static void fd_print_usage(void) {
 	VG_(printf)(
 "    --precision=<number>      the precision of the shadow values [120]\n"
 "    --mean-error=no|yes       compute mean and max error for each operation [yes]\n"
@@ -149,35 +148,42 @@ static void fd_print_usage(void) {
 	);
 }
 
-static void fd_print_debug_usage(void) {  
+static void fd_print_debug_usage(void) {
 	VG_(printf)("    (none)\n");
 }
 
-/* hash tables for maping the addresses of the original floating-point values 
-   to the shadow values */
-static VgHashTable globalMemory 	= NULL;
-static VgHashTable meanValues 		= NULL;
+static int abs(int x) {
+	if (x >= 0) {
+		return x;
+	} else {
+		return -x;
+	}
+}
+
+/* globalMemory is the hash table for maping the addresses of the
+   original floating-point values to the shadow values. */
+static VgHashTable* globalMemory 	= NULL; /* Hash table with ShadowValue* */
+static VgHashTable* meanValues 		= NULL; /* Hash table with MeanValue* */
 static OSet* originAddrSet 			= NULL;
 static OSet* unsupportedOps			= NULL;
 
 static Store* 			storeArgs 	= NULL;
-static Mux0X* 			muxArgs 	= NULL;
+static ITE* 			muxArgs 	= NULL;
 static UnOp* 			unOpArgs 	= NULL;
 static BinOp* 			binOpArgs 	= NULL;
 static TriOp* 			triOpArgs 	= NULL;
 static CircularRegs* 	circRegs	= NULL;
 
-static ShadowValue* 	threadRegisters[VG_N_THREADS][MAX_REGISTERS];
+static ShadowValue*** 	threadRegisters = NULL; /* threadRegisters[VG_N_THREADS][MAX_REGISTERS] */
 static ShadowValue* 	localTemps[MAX_TEMPS];
 static ShadowTmp* 		sTmp[TMP_COUNT];
 static ShadowConst* 	sConst[CONST_COUNT];
 static Stage* 			stages[MAX_STAGES];
-static StageReport*		stageReports[MAX_STAGES];
+static VgHashTable*	stageReports[MAX_STAGES]; /* Hash table for each stage with StageReport* */
 
-static Char 			formatBuf[FORMATBUF_SIZE]; 
-static Char 			description[DESCRIPTION_SIZE];
-static Char 			filename[FILENAME_SIZE];
-static Char 			fwrite_buf[FWRITE_BUFSIZE];
+static HChar 			formatBuf[FORMATBUF_SIZE];
+static HChar 			filename[FILENAME_SIZE];
+static HChar 			fwrite_buf[FWRITE_BUFSIZE];
 
 static mpfr_t meanOrg, meanRelError;
 static mpfr_t stageOrg, stageDiff, stageRelError;
@@ -190,10 +196,10 @@ static mpfr_t cancelTemp;
 static mpfr_t arg1tmpX, arg2tmpX, arg3tmpX;
 
 
-static Char* mpfrToStringShort(Char* str, mpfr_t* fp) {
+static void mpfrToStringShort(HChar* str, mpfr_t* fp) {
 	if (mpfr_cmp_ui(*fp, 0) == 0) {
 		str[0] = '0'; str[1] = '\0';
-		return str;
+		return;
 	}
 
 	Int sgn = mpfr_sgn(*fp);
@@ -203,7 +209,7 @@ static Char* mpfrToStringShort(Char* str, mpfr_t* fp) {
 		str[0] = '-'; str[1] = '\0';
 	}
 
-	Char mpfr_str[4]; /* digits + 1 */
+	HChar mpfr_str[4]; /* digits + 1 */
 	mpfr_exp_t exp;
 	/* digits_base10 = log10 ( 2^(significant bits) ) */
 	mpfr_get_str(mpfr_str, &exp, /* base */ 10, 3, *fp, STD_RND);
@@ -218,13 +224,12 @@ static Char* mpfrToStringShort(Char* str, mpfr_t* fp) {
 		str[2] = '.';
 	}
 
-	Char exp_str[10];
+	HChar exp_str[10];
 	VG_(sprintf)(exp_str, " * 10^%ld", exp);
 	VG_(strcat)(str, exp_str);
-	return str;
 }
 
-static Char* mpfrToString(Char* str, mpfr_t* fp) {
+static void mpfrToString(HChar* str, mpfr_t* fp) {
 	Int sgn = mpfr_sgn(*fp);
 	if (sgn >= 0) {
 		str[0] = ' '; str[1] = '0'; str[2] = '\0';
@@ -232,7 +237,7 @@ static Char* mpfrToString(Char* str, mpfr_t* fp) {
 		str[0] = '-'; str[1] = '\0';
 	}
 
-	Char mpfr_str[60]; /* digits + 1 */
+	HChar mpfr_str[60]; /* digits + 1 */
 	mpfr_exp_t exp;
 	/* digits_base10 = log10 ( 2^(significant bits) ) */
 	mpfr_get_str(mpfr_str, &exp, /* base */ 10, /* digits, float: 7, double: 15 */ 15, *fp, STD_RND);
@@ -247,24 +252,23 @@ static Char* mpfrToString(Char* str, mpfr_t* fp) {
 		str[2] = '.';
 	}
 
-	Char exp_str[50];
+	HChar exp_str[50];
 	VG_(sprintf)(exp_str, " * 10^%ld", exp);
 	VG_(strcat)(str, exp_str);
 
 	mpfr_prec_t pre_min = mpfr_min_prec(*fp);
 	mpfr_prec_t pre = mpfr_get_prec(*fp);
-	Char pre_str[50];
+	HChar pre_str[50];
 	VG_(sprintf)(pre_str, ", %ld/%ld bit", pre_min, pre);
 	VG_(strcat)(str, pre_str);
-	return str;
 }
 
-static Bool ignoreFile(Char* desc) {
+static Bool ignoreFile(const HChar* desc) {
 	if (!clo_ignoreLibraries) {
 		return False;
 	}
 	/* simple patern matching - only for one short pattern */
-	Char* pattern = ".so";
+	const HChar* pattern = ".so";
 	Int pi = 0;
 	Int i = 0;
 	while (desc[i] != '\0' && i < 256) {
@@ -283,7 +287,7 @@ static Bool isInLibrary(Addr64 addr) {
 	DebugInfo* dinfo = VG_(find_DebugInfo)((Addr)addr);
 	if (!dinfo) return False; /* be save if not sure */
 
-	const UChar* soname = VG_(DebugInfo_get_soname)(dinfo);
+	const HChar* soname = VG_(DebugInfo_get_soname)(dinfo);
 	tl_assert(soname);
 	if (0) VG_(printf)("%s\n", soname);
 
@@ -450,7 +454,7 @@ static void updateMeanValue(UWord key, IROp op, mpfr_t* shadow, mpfr_exp_t cance
 	}
 }
 
-static void stageClearVals(VgHashTable t) {
+static void stageClearVals(VgHashTable* t) {
 	if (t == NULL) {
 		return;
 	}
@@ -460,12 +464,12 @@ static void stageClearVals(VgHashTable t) {
 	while (next = VG_(HT_Next)(t)) {
 		mpfr_clears(next->val, next->relError, NULL);
 	}
-	VG_(HT_destruct)(t);
+	VG_(HT_destruct)(t, VG_(free));
 }
 
 static void stageStart(Int num) {
 	tl_assert(num < MAX_STAGES);
-	
+
 	if (stages[num]) {
 		tl_assert(!stages[num]->active);
 		stages[num]->active = True;
@@ -486,8 +490,6 @@ static void stageEnd(Int num) {
 	tl_assert(stages[num]->active);
 
 	Int mateCount = -1;
-	Int newNodes = 0;
-	Int oldNodes = 0;
 
 	if (stages[num]->newVals && stages[num]->oldVals) {
 		mateCount = 0;
@@ -509,7 +511,7 @@ static void stageEnd(Int num) {
 			mpfr_sub(stageDiff, mate->relError, next->relError, STD_RND);
 			mpfr_abs(stageDiff, stageDiff, STD_RND);
 
-			Char mpfrBuf[MPFR_BUFSIZE];
+			HChar mpfrBuf[MPFR_BUFSIZE];
 			if (sl) {
 				if (mpfr_cmp(stageDiff, sl->limit) > 0) {
 					mpfrToString(mpfrBuf, &(sl->limit));
@@ -613,7 +615,7 @@ static void stageClear(Int num) {
 		while ( (next = VG_(HT_Next)(stages[num]->limits)) ) {
 			mpfr_clear(next->limit);
 		}
-		VG_(HT_destruct)(stages[num]->limits);
+		VG_(HT_destruct)(stages[num]->limits, VG_(free));
 	}
 	stages[num] = NULL;
 }
@@ -667,7 +669,7 @@ void readSConst(Int num, mpfr_t* fp) {
 			db = &v128;
 			mpfr_set_d(*fp, *db, STD_RND);
 			break;
-		default:		
+		default:
 			VG_(tool_panic)("Unhandled case in readSConst\n");
 			break;
 	}
@@ -715,7 +717,7 @@ void readSTemp(Int num, mpfr_t* fp) {
 			mpfr_set_d(*fp, sTmp[num]->Val.F64, STD_RND);
 			break;
 		case Ity_V128:
-			/* Not a general solution, because this does not work if vectors are used 
+			/* Not a general solution, because this does not work if vectors are used
 			   e.g. two/four additions with one SSE instruction */
 			if (sTmp[num]->U128[1] == 0) {
 				if (clo_simulateOriginal) mpfr_set_prec(*fp, 24);
@@ -784,7 +786,7 @@ static VG_REGPARM(2) void processUnOp(Addr addr, UWord ca) {
 	Addr argOrigin = 0;
 	mpfr_exp_t argCanceled = 0;
 	Addr argCancelOrigin = 0;
- 
+
 	if (clo_simulateOriginal) {
 		if (isOpFloat(binOpArgs->op)) {
 			mpfr_set_prec(arg1tmpX, 24);
@@ -870,7 +872,7 @@ static void instrumentUnOp(IRSB* sb, IRTypeEnv* env, Addr addr, IRTemp wrTemp, I
 	addStmtToIRSB(sb, store);
 
 	Int constArgs = 0;
-	
+
 	if (arg->tag == Iex_RdTmp) {
 		if (argTmpInstead >= 0) {
 			store = IRStmt_Store(Iend_LE, mkU64(&(unOpArgs->arg)), mkU32(argTmpInstead));
@@ -1059,7 +1061,7 @@ static VG_REGPARM(2) void processBinOp(Addr addr, UWord ca) {
 	}
 	res->canceled = maxC;
 	res->cancelOrigin = maxCorigin;
-	
+
 	if (clo_computeMeanValue) {
 		UInt cancellationBadness = 0;
 		if (clo_bad_cancellations && canceled > 0) {
@@ -1314,10 +1316,10 @@ static void instrumentTriOp(IRSB* sb, IRTypeEnv* env, Addr addr, IRTemp wrTemp, 
 		return;
 	}
 
-	IROp op = triop->Iex.Triop.op;
-	IRExpr* arg1 = triop->Iex.Triop.arg1;
-	IRExpr* arg2 = triop->Iex.Triop.arg2;
-	IRExpr* arg3 = triop->Iex.Triop.arg3;
+	IROp op = triop->Iex.Triop.details->op;
+	IRExpr* arg1 = triop->Iex.Triop.details->arg1;
+	IRExpr* arg2 = triop->Iex.Triop.details->arg2;
+	IRExpr* arg3 = triop->Iex.Triop.details->arg3;
 
 	tl_assert(arg1->tag == Iex_Const);
 	tl_assert(arg2->tag == Iex_RdTmp || arg2->tag == Iex_Const);
@@ -1330,17 +1332,17 @@ static void instrumentTriOp(IRSB* sb, IRTypeEnv* env, Addr addr, IRTemp wrTemp, 
 	store = IRStmt_Store(Iend_LE, mkU64(&(triOpArgs->wrTmp)), mkU32(wrTemp));
 	addStmtToIRSB(sb, store);
 
-	/* arg1 is ignored because it only contains the rounding mode for 
+	/* arg1 is ignored because it only contains the rounding mode for
 	   the operations instructed at the moment */
 
 	if (arg2->tag == Iex_RdTmp) {
 		if (arg2tmpInstead >= 0) {
 			store = IRStmt_Store(Iend_LE, mkU64(&(triOpArgs->arg2)), mkU32(arg2tmpInstead));
 		} else {
-			store = IRStmt_Store(Iend_LE, mkU64(&(triOpArgs->arg2)), mkU32(triop->Iex.Triop.arg2->Iex.RdTmp.tmp));
+			store = IRStmt_Store(Iend_LE, mkU64(&(triOpArgs->arg2)), mkU32(triop->Iex.Triop.details->arg2->Iex.RdTmp.tmp));
 		}
 		addStmtToIRSB(sb, store);
-		writeSTemp(sb, env, triop->Iex.Triop.arg2->Iex.RdTmp.tmp, 1);
+		writeSTemp(sb, env, triop->Iex.Triop.details->arg2->Iex.RdTmp.tmp, 1);
 	} else {
 		tl_assert(arg2->tag == Iex_Const);
 		writeSConst(sb, arg2->Iex.Const.con, 1);
@@ -1351,10 +1353,10 @@ static void instrumentTriOp(IRSB* sb, IRTypeEnv* env, Addr addr, IRTemp wrTemp, 
 		if (arg3tmpInstead >= 0) {
 			store = IRStmt_Store(Iend_LE, mkU64(&(triOpArgs->arg3)), mkU32(arg3tmpInstead));
 		} else {
-			store = IRStmt_Store(Iend_LE, mkU64(&(triOpArgs->arg3)), mkU32(triop->Iex.Triop.arg3->Iex.RdTmp.tmp));
+			store = IRStmt_Store(Iend_LE, mkU64(&(triOpArgs->arg3)), mkU32(triop->Iex.Triop.details->arg3->Iex.RdTmp.tmp));
 		}
 		addStmtToIRSB(sb, store);
-		writeSTemp(sb, env, triop->Iex.Triop.arg3->Iex.RdTmp.tmp, 2);
+		writeSTemp(sb, env, triop->Iex.Triop.details->arg3->Iex.RdTmp.tmp, 2);
 	} else {
 		tl_assert(arg3->tag == Iex_Const);
 		writeSConst(sb, arg3->Iex.Const.con, 2);
@@ -1369,7 +1371,7 @@ static void instrumentTriOp(IRSB* sb, IRTypeEnv* env, Addr addr, IRTemp wrTemp, 
 	addStmtToIRSB(sb, IRStmt_Dirty(di));
 }
 
-static VG_REGPARM(1) void processMux0X(UWord ca) {
+static VG_REGPARM(1) void processITE(UWord ca) {
 	if (!clo_analyze) return;
 
 	Int constArgs = (Int)ca;
@@ -1406,12 +1408,12 @@ static VG_REGPARM(1) void processMux0X(UWord ca) {
 	}
 }
 
-static void instrumentMux0X(IRSB* sb, IRTypeEnv* env, IRTemp wrTemp, IRExpr* mux, Int arg0tmpInstead, Int argXtmpInstead) {
-	tl_assert(mux->tag == Iex_Mux0X);
+static void instrumentITE(IRSB* sb, IRTypeEnv* env, IRTemp wrTemp, IRExpr* mux, Int arg0tmpInstead, Int argXtmpInstead) {
+	tl_assert(mux->tag == Iex_ITE);
 
-	IRExpr* cond = mux->Iex.Mux0X.cond;
-	IRExpr* expr0 = mux->Iex.Mux0X.expr0;
-	IRExpr* exprX = mux->Iex.Mux0X.exprX;
+	IRExpr* cond = mux->Iex.ITE.cond;
+	IRExpr* expr0 = mux->Iex.ITE.iftrue;
+	IRExpr* exprX = mux->Iex.ITE.iffalse;
 
 	tl_assert(cond->tag == Iex_RdTmp);
 	tl_assert(expr0->tag == Iex_RdTmp || expr0->tag == Iex_Const);
@@ -1420,14 +1422,14 @@ static void instrumentMux0X(IRSB* sb, IRTypeEnv* env, IRTemp wrTemp, IRExpr* mux
 	Int constArgs = 0;
 	IRStmt* store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->wrTmp)), mkU32(wrTemp));
 	addStmtToIRSB(sb, store);
-	store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->condVal)), mux->Iex.Mux0X.cond);
+	store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->condVal)), mkU32(mux->Iex.ITE.cond));
 	addStmtToIRSB(sb, store);
 
 	if (expr0->tag == Iex_RdTmp) {
 		if (arg0tmpInstead >= 0) {
 			store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->expr0)), mkU32(arg0tmpInstead));
 		} else {
-			store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->expr0)), mkU32(mux->Iex.Mux0X.expr0->Iex.RdTmp.tmp));
+			store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->expr0)), mkU32(mux->Iex.ITE.iftrue->Iex.RdTmp.tmp));
 		}
 		addStmtToIRSB(sb, store);
 	} else {
@@ -1438,7 +1440,7 @@ static void instrumentMux0X(IRSB* sb, IRTypeEnv* env, IRTemp wrTemp, IRExpr* mux
 		if (argXtmpInstead >= 0) {
 			store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->exprX)), mkU32(argXtmpInstead));
 		} else {
-			store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->exprX)), mkU32(mux->Iex.Mux0X.exprX->Iex.RdTmp.tmp));
+			store = IRStmt_Store(Iend_LE, mkU64(&(muxArgs->exprX)), mkU32(mux->Iex.ITE.iffalse->Iex.RdTmp.tmp));
 		}
 		addStmtToIRSB(sb, store);
 	} else {
@@ -1446,7 +1448,7 @@ static void instrumentMux0X(IRSB* sb, IRTypeEnv* env, IRTemp wrTemp, IRExpr* mux
 	}
 
 	IRExpr** argv = mkIRExprVec_1(mkU64(constArgs));
-	IRDirty* di = unsafeIRDirty_0_N(1, "processMux0X", VG_(fnptr_to_fnentry)(&processMux0X), argv);
+	IRDirty* di = unsafeIRDirty_0_N(1, "processITE", VG_(fnptr_to_fnentry)(&processITE), argv);
 	addStmtToIRSB(sb, IRStmt_Dirty(di));
 }
 
@@ -1470,7 +1472,7 @@ static void instrumentLoad(IRSB* sb, IRTypeEnv* env, IRStmt* wrTmp) {
 	if (load->Iex.Load.addr->tag != Iex_RdTmp) {
 		return;
 	}
-	
+
 	IRExpr** argv = mkIRExprVec_2(mkU64(wrTmp->Ist.WrTmp.tmp), load->Iex.Load.addr);
 	IRDirty* di = unsafeIRDirty_0_N(2, "processLoad", VG_(fnptr_to_fnentry)(&processLoad), argv);
 	addStmtToIRSB(sb, IRStmt_Dirty(di));
@@ -1507,7 +1509,7 @@ static VG_REGPARM(3) void processStore(Addr addr, UWord t, UWord isFloat) {
 			} else {
 				tl_assert(False);
 			}
-	
+
 			if (activeStages > 0) {
 				updateStages(addr, res->orgType == Ot_FLOAT);
 			}
@@ -1559,7 +1561,7 @@ static void instrumentStore(IRSB* sb, IRTypeEnv* env, IRStmt* store, Int argTmpI
 			addStmtToIRSB(sb, store);
 		}
 	}
-	
+
 	IRExpr** argv = mkIRExprVec_3(addr, mkU64(num), mkU64(isFloat));
 	IRDirty* di = unsafeIRDirty_0_N(3, "processStore", VG_(fnptr_to_fnentry)(&processStore), argv);
 	addStmtToIRSB(sb, IRStmt_Dirty(di));
@@ -1590,7 +1592,7 @@ static VG_REGPARM(2) void processPut(UWord offset, UWord t) {
 	}
 
 	if (currentVal && !res) {
-		/* Invalidate existing shadow value (not free) because 
+		/* Invalidate existing shadow value (not free) because
            something was stored in this register */
 		currentVal->active = False;
 	}
@@ -1677,7 +1679,7 @@ static VG_REGPARM(3) void processPutI(UWord t, UWord b, UWord n) {
 	}
 
 	if (currentVal && !res) {
-		/* Invalidate existing shadow value (not free) because 
+		/* Invalidate existing shadow value (not free) because
            something was stored in this register. */
 		currentVal->active = False;
 	}
@@ -1685,10 +1687,10 @@ static VG_REGPARM(3) void processPutI(UWord t, UWord b, UWord n) {
 
 static void instrumentPutI(IRSB* sb, IRTypeEnv* env, IRStmt* st, Int argTmpInstead) {
 	tl_assert(st->tag == Ist_PutI);
-	IRExpr* data = st->Ist.PutI.data;
-	IRExpr* ix = st->Ist.PutI.ix;
-	IRRegArray* descr = st->Ist.PutI.descr;
-	Int bias = st->Ist.PutI.bias;
+	IRExpr* data = st->Ist.PutI.details->data;
+	IRExpr* ix = st->Ist.PutI.details->ix;
+	IRRegArray* descr = st->Ist.PutI.details->descr;
+	Int bias = st->Ist.PutI.details->bias;
 
 	tl_assert(data->tag == Iex_RdTmp || data->tag == Iex_Const);
 	tl_assert(ix->tag == Iex_RdTmp || ix->tag == Iex_Const);
@@ -1779,9 +1781,13 @@ static void reportUnsupportedOp(IROp op) {
 	}
 }
 
-static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
-                      VexGuestLayout* layout, VexGuestExtents* vge,
-                      IRType gWordTy, IRType hWordTy)
+static
+IRSB* fd_instrument ( VgCallbackClosure* closure,
+                      IRSB* sbIn,
+                      const VexGuestLayout* layout,
+                      const VexGuestExtents* vge,
+                      const VexArchInfo* archinfo_host,
+                      IRType gWordTy, IRType hWordTy )
 {
 	Int			i;
 	IRSB*      	sbOut;
@@ -1789,7 +1795,7 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
    	IRTypeEnv* 	tyenv = sbIn->tyenv;
 	IRExpr* 	expr;
 	/* address of current client instruction */
-	Addr		cia = 0, dst;
+	Addr		cia = 0;
 
 	if (gWordTy != hWordTy) {
 		/* This case is not supported yet. */
@@ -1810,18 +1816,12 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 	}
 
 	/* perform optimizations for each superblock */
-
-	Bool sbInstrNeeded = False;
 	if (maxTemps < tyenv->types_used) {
 		maxTemps = tyenv->types_used;
 	}
 
 	Int j;
 
-	Bool impReg[MAX_REGISTERS];
-	for (j = 0; j < MAX_REGISTERS; j++) {
-		impReg[j] = True;
-	}
 	Int impTmp[tyenv->types_used];
 	for (j = 0; j < tyenv->types_used; j++) {
 		impTmp[j] = 0;
@@ -1831,11 +1831,9 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 	for (j = sbIn->stmts_used - 1; j >= i; j--) {
 		IRStmt* st = sbIn->stmts[j];
 		if (!st || st->tag == Ist_NoOp) continue;
-      
+
 		switch (st->tag) {
 			case Ist_Put:
-				impReg[st->Ist.Put.offset] = False;
-
 				if (st->Ist.Put.data->tag == Iex_RdTmp) {
 					impTmp[st->Ist.Put.data->Iex.RdTmp.tmp] = 1;
 				}
@@ -1850,7 +1848,6 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 
 		        switch (expr->tag) {
 					case Iex_Get:
-						impReg[expr->Iex.Get.offset] = True;
 						break;
 					case Iex_Unop:
 						switch (expr->Iex.Unop.op) {
@@ -1918,30 +1915,30 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 						}
 						break;
 					case Iex_Triop:
-						switch (expr->Iex.Triop.op) {
+						switch (expr->Iex.Triop.details->op) {
 							case Iop_AddF64:
 							case Iop_SubF64:
 							case Iop_MulF64:
 							case Iop_DivF64:
-								if (expr->Iex.Triop.arg2->tag == Iex_RdTmp) {
-									impTmp[expr->Iex.Triop.arg2->Iex.RdTmp.tmp] = 1;
+								if (expr->Iex.Triop.details->arg2->tag == Iex_RdTmp) {
+									impTmp[expr->Iex.Triop.details->arg2->Iex.RdTmp.tmp] = 1;
 								}
-								if (expr->Iex.Triop.arg3->tag == Iex_RdTmp) {
-									impTmp[expr->Iex.Triop.arg3->Iex.RdTmp.tmp] = 1;
+								if (expr->Iex.Triop.details->arg3->tag == Iex_RdTmp) {
+									impTmp[expr->Iex.Triop.details->arg3->Iex.RdTmp.tmp] = 1;
 								}
 								break;
 							default:
 								/* backward -> args are important */
-								if (expr->Iex.Triop.arg2->tag == Iex_RdTmp && impTmp[expr->Iex.Triop.arg2->Iex.RdTmp.tmp] == 0) {
-									impTmp[expr->Iex.Triop.arg2->Iex.RdTmp.tmp] = -1;
+								if (expr->Iex.Triop.details->arg2->tag == Iex_RdTmp && impTmp[expr->Iex.Triop.details->arg2->Iex.RdTmp.tmp] == 0) {
+									impTmp[expr->Iex.Triop.details->arg2->Iex.RdTmp.tmp] = -1;
 								}
-								if (expr->Iex.Triop.arg3->tag == Iex_RdTmp && impTmp[expr->Iex.Triop.arg3->Iex.RdTmp.tmp] == 0) {
-									impTmp[expr->Iex.Triop.arg3->Iex.RdTmp.tmp] = -1;
+								if (expr->Iex.Triop.details->arg3->tag == Iex_RdTmp && impTmp[expr->Iex.Triop.details->arg3->Iex.RdTmp.tmp] == 0) {
+									impTmp[expr->Iex.Triop.details->arg3->Iex.RdTmp.tmp] = -1;
 								}
 								break;
 						}
 						break;
-					case Iex_Mux0X:
+					case Iex_ITE:
 						/* nothing, impTmp is already true */
 						break;
 					default:
@@ -1967,7 +1964,7 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 	for (j = i; j < sbIn->stmts_used; j++) {
 		IRStmt* st = sbIn->stmts[j];
 		if (!st || st->tag == Ist_NoOp) continue;
-      
+
 		switch (st->tag) {
 			case Ist_Put:
 				if (st->Ist.Put.data->tag == Iex_RdTmp) {
@@ -2023,7 +2020,7 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 							case Iop_F64toF32:
 								if (expr->Iex.Binop.arg2->tag == Iex_RdTmp) {
 									if (tmpInstead[expr->Iex.Binop.arg2->Iex.RdTmp.tmp] >= 0) {
-										tmpInstead[st->Ist.WrTmp.tmp] = tmpInstead[expr->Iex.Binop.arg2->Iex.RdTmp.tmp]; 
+										tmpInstead[st->Ist.WrTmp.tmp] = tmpInstead[expr->Iex.Binop.arg2->Iex.RdTmp.tmp];
 									} else {
 										tmpInstead[st->Ist.WrTmp.tmp] = expr->Iex.Binop.arg2->Iex.RdTmp.tmp;
 									}
@@ -2033,13 +2030,13 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 							case Iop_32HLto64:
 								if (expr->Iex.Binop.arg1->tag == Iex_RdTmp) {
 									if (tmpInstead[expr->Iex.Binop.arg1->Iex.RdTmp.tmp] >= 0) {
-										tmpInstead[st->Ist.WrTmp.tmp] = tmpInstead[expr->Iex.Binop.arg1->Iex.RdTmp.tmp]; 
+										tmpInstead[st->Ist.WrTmp.tmp] = tmpInstead[expr->Iex.Binop.arg1->Iex.RdTmp.tmp];
 									} else {
 										tmpInstead[st->Ist.WrTmp.tmp] = expr->Iex.Binop.arg1->Iex.RdTmp.tmp;
 									}
 								} else if (expr->Iex.Binop.arg2->tag == Iex_RdTmp) {
 									if (tmpInstead[expr->Iex.Binop.arg2->Iex.RdTmp.tmp] >= 0) {
-										tmpInstead[st->Ist.WrTmp.tmp] = tmpInstead[expr->Iex.Binop.arg2->Iex.RdTmp.tmp]; 
+										tmpInstead[st->Ist.WrTmp.tmp] = tmpInstead[expr->Iex.Binop.arg2->Iex.RdTmp.tmp];
 									} else {
 										tmpInstead[st->Ist.WrTmp.tmp] = expr->Iex.Binop.arg2->Iex.RdTmp.tmp;
 									}
@@ -2068,7 +2065,7 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 	for (/*use current i*/; i < sbIn->stmts_used; i++) {
 		IRStmt* st = sbIn->stmts[i];
 		if (!st || st->tag == Ist_NoOp) continue;
-      
+
 		switch (st->tag) {
 			case Ist_AbiHint:
 				addStmtToIRSB(sbOut, st);
@@ -2090,8 +2087,8 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 			case Ist_PutI:
 				addStmtToIRSB(sbOut, st);
 				arg1tmpInstead = -1;
-				if (st->Ist.PutI.data->tag == Iex_RdTmp) {
-					arg1tmpInstead = tmpInstead[st->Ist.PutI.data->Iex.RdTmp.tmp];
+				if (st->Ist.PutI.details->data->tag == Iex_RdTmp) {
+					arg1tmpInstead = tmpInstead[st->Ist.PutI.details->data->Iex.RdTmp.tmp];
 				}
 				instrumentPutI(sbOut, tyenv, st, arg1tmpInstead);
 				break;
@@ -2162,25 +2159,14 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 								/* ignored floating-point and related SSE operations */
 								addStmtToIRSB(sbOut, st);
 								break;
-							case Iop_Recip32Fx4:
-        					case Iop_Sqrt32Fx4:
-							case Iop_RSqrt32Fx4:
 							case Iop_RoundF32x4_RM:
 							case Iop_RoundF32x4_RP:
 							case Iop_RoundF32x4_RN:
 							case Iop_RoundF32x4_RZ:
-							case Iop_Recip32F0x4:
-							case Iop_RSqrt32F0x4:
-							case Iop_Recip64Fx2:
-							case Iop_Sqrt64Fx2:
-							case Iop_RSqrt64Fx2:
-							case Iop_Recip64F0x2:
-							case Iop_RSqrt64F0x2:
 							case Iop_SinF64:
 							case Iop_CosF64:
 							case Iop_TanF64:
 							case Iop_2xm1F64:
-							case Iop_Est5FRSqrt:
 							case Iop_RoundF64toF64_NEAREST:
 							case Iop_RoundF64toF64_NegINF:
 							case Iop_RoundF64toF64_PosINF:
@@ -2240,7 +2226,6 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 							case Iop_Max64Fx2:
 							case Iop_Min64Fx2:
 							case Iop_SqrtF64:
-							case Iop_SqrtF64r32:
 							case Iop_SqrtF32:
 							case Iop_AtanF64:
 							case Iop_Yl2xF64:
@@ -2266,20 +2251,20 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 						}
 						break;
 					case Iex_Triop:
-						switch (expr->Iex.Triop.op) {
+						switch (expr->Iex.Triop.details->op) {
 							case Iop_AddF64:
 							case Iop_SubF64:
 							case Iop_MulF64:
 							case Iop_DivF64:
 								addStmtToIRSB(sbOut, st);
-								
+
 								arg1tmpInstead = -1;
 								arg2tmpInstead = -1;
-								if (expr->Iex.Triop.arg2->tag == Iex_RdTmp) {
-									arg1tmpInstead = tmpInstead[expr->Iex.Triop.arg2->Iex.RdTmp.tmp];
+								if (expr->Iex.Triop.details->arg2->tag == Iex_RdTmp) {
+									arg1tmpInstead = tmpInstead[expr->Iex.Triop.details->arg2->Iex.RdTmp.tmp];
 								}
-								if (expr->Iex.Triop.arg3->tag == Iex_RdTmp) {
-									arg2tmpInstead = tmpInstead[expr->Iex.Triop.arg3->Iex.RdTmp.tmp];
+								if (expr->Iex.Triop.details->arg3->tag == Iex_RdTmp) {
+									arg2tmpInstead = tmpInstead[expr->Iex.Triop.details->arg3->Iex.RdTmp.tmp];
 								}
 								instrumentTriOp(sbOut, tyenv, cia, st->Ist.WrTmp.tmp, expr, arg1tmpInstead, arg2tmpInstead);
 								break;
@@ -2300,7 +2285,7 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
       						case Iop_PRem1C3210F64:
       						case Iop_ScaleF64:
 								addStmtToIRSB(sbOut, st);
-								reportUnsupportedOp(expr->Iex.Triop.op);
+								reportUnsupportedOp(expr->Iex.Triop.details->op);
 								break;
 							default:
 								addStmtToIRSB(sbOut, st);
@@ -2308,31 +2293,31 @@ static IRSB* fd_instrument(VgCallbackClosure* closure, IRSB* sbIn,
 						}
 						break;
 					case Iex_Qop:
-						switch (expr->Iex.Qop.op) {
+						switch (expr->Iex.Qop.details->op) {
 							case Iop_MAddF64r32:
 							case Iop_MSubF64r32:
 							case Iop_MAddF64:
 							case Iop_MSubF64:
 								addStmtToIRSB(sbOut, st);
-								reportUnsupportedOp(expr->Iex.Qop.op);
+								reportUnsupportedOp(expr->Iex.Qop.details->op);
 								break;
 							default:
 								addStmtToIRSB(sbOut, st);
 								break;
 						}
 						break;
-					case Iex_Mux0X:
+					case Iex_ITE:
 						addStmtToIRSB(sbOut, st);
 
 						arg1tmpInstead = -1;
 						arg2tmpInstead = -1;
-						if (expr->Iex.Mux0X.expr0->tag == Iex_RdTmp) {
-							arg1tmpInstead = tmpInstead[expr->Iex.Mux0X.expr0->Iex.RdTmp.tmp];
+						if (expr->Iex.ITE.iftrue->tag == Iex_RdTmp) {
+							arg1tmpInstead = tmpInstead[expr->Iex.ITE.iftrue->Iex.RdTmp.tmp];
 						}
-						if (expr->Iex.Mux0X.exprX->tag == Iex_RdTmp) {
-							arg2tmpInstead = tmpInstead[expr->Iex.Mux0X.exprX->Iex.RdTmp.tmp];
+						if (expr->Iex.ITE.iffalse->tag == Iex_RdTmp) {
+							arg2tmpInstead = tmpInstead[expr->Iex.ITE.iffalse->Iex.RdTmp.tmp];
 						}
-						instrumentMux0X(sbOut, tyenv, st->Ist.WrTmp.tmp, expr, arg1tmpInstead, arg2tmpInstead);
+						instrumentITE(sbOut, tyenv, st->Ist.WrTmp.tmp, expr, arg1tmpInstead, arg2tmpInstead);
 						break;
 					case Iex_CCall:
 						addStmtToIRSB(sbOut, st);
@@ -2421,8 +2406,8 @@ static void getIntroducedError(mpfr_t* introducedError, MeanValue* mv) {
 	}
 }
 
-static void getFileName(Char* name) {
-	Char tempName[256];
+static void getFileName(HChar* name) {
+	HChar tempName[256];
 	struct vg_stat st;
 	int i;
 	for (i = 1; i < 100; ++i) {
@@ -2443,7 +2428,7 @@ void fwrite_flush(void) {
     fwrite_pos = 0;
 }
 
-static void my_fwrite(Int fd, Char* buf, Int len) {
+static void my_fwrite(Int fd, const HChar* buf, Int len) {
     if (fwrite_fd != fd) {
 		fwrite_flush();
 		fwrite_fd = fd;
@@ -2489,7 +2474,7 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 			VG_(OSetWord_Destroy)(originAddrSet);
 		}
 		originAddrSet = VG_(OSetWord_Create)(VG_(malloc), "fd.writeOriginGraph.1", VG_(free));
-	} 
+	}
 	tl_assert(originAddrSet);
 
 	MeanValue* mv = VG_(HT_lookup)(meanValues, origin);
@@ -2498,15 +2483,15 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 	if (careVisited) {
 		mv->visited = True;
 	}
-	
+
 	Bool cycle = False;
 	Bool inLibrary = False;
 	if (VG_(OSetWord_Contains)(originAddrSet, origin)) {
 		cycle = True;
 	} else {
 		/* create node */
-		VG_(describe_IP)(origin, description, DESCRIPTION_SIZE);
-		if (ignoreFile(description)) {
+		const HChar* originIp = VG_(describe_IP)(origin, NULL);
+		if (ignoreFile(originIp)) {
 			inLibrary = True;
 		}
 
@@ -2532,37 +2517,36 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 		} else {
 			color = 1; /* blue */
 		}
-		
+
 		mpfr_div_ui(dumpGraphMeanError, mv->sum, mv->count, STD_RND);
 
 		opToStr(mv->op);
-		Char meanErrorStr[MPFR_BUFSIZE];
+		HChar meanErrorStr[MPFR_BUFSIZE];
 		mpfrToStringShort(meanErrorStr, &dumpGraphMeanError);
-		Char maxErrorStr[MPFR_BUFSIZE];
+		HChar maxErrorStr[MPFR_BUFSIZE];
 		mpfrToStringShort(maxErrorStr, &(mv->max));
 
-		Char canceledAvg[10];
+		HChar canceledAvg[10];
 		if (mv->overflow) {
 			VG_(sprintf)(canceledAvg, "overflow");
 		} else {
 			VG_(sprintf)(canceledAvg, "%ld", mv->canceledSum / mv->count);
 		}
 
-		Char filename[20];
-		filename[0] = '\0';
-		VG_(get_filename)(origin, filename, 19);
+		const HChar *originFilename;
+		VG_(get_filename)(origin, &originFilename);
 
 		UInt linenum = -1;
 		Bool gotLine = VG_(get_linenum)(origin, &linenum);
-		Char linenumber[10];
+		HChar linenumber[10];
 		linenumber[0] = '\0';
 		if (gotLine) {
 			VG_(sprintf)(linenumber, ":%u", linenum);
 		}
 
 		VG_(sprintf)(formatBuf, "node: { title: \"0x%lX\" label: \"%s (%s%s)\" color: %d info1: \"%s (%'u)\" info2: \"avg: %s, max: %s\" "
-			"info3: \"canceled - avg: %s, max: %ld\" }\n", 
-			origin, opStr, filename, linenumber, color, description, mv->count, meanErrorStr, maxErrorStr, canceledAvg, mv->canceledMax);
+			"info3: \"canceled - avg: %s, max: %ld\" }\n",
+			origin, opStr, originFilename, linenumber, color, originIp, mv->count, meanErrorStr, maxErrorStr, canceledAvg, mv->canceledMax);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	}
 
@@ -2573,13 +2557,13 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 
 		getIntroducedError(&dumpGraphDiff, mv);
 
-		Char diffStr[30];
-		mpfrToStringShort(&diffStr, &dumpGraphDiff);
+		HChar diffStr[30];
+		mpfrToStringShort(diffStr, &dumpGraphDiff);
 
 		VG_(sprintf)(formatBuf, "edge: { sourcename: \"0x%lX\" targetname: \"0x%lX\" label: \"%s\" class: 1 color : %d }\n", origin, oldAddr, diffStr, edgeColor);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	}
-	
+
 	if (cycle) {
 		return;
 	}
@@ -2608,29 +2592,29 @@ static void writeOriginGraph(Int file, Addr oldAddr, Addr origin, Int arg, Int l
 			if (red > 120) red = 120;
 			Int green = red + 100;
 
-			VG_(describe_IP)(mv->arg1, description, DESCRIPTION_SIZE);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg1Ip = VG_(describe_IP)(mv->arg1, NULL);
+			if (!inLibrary || !ignoreFile(arg1Ip)) {
 				writeOriginGraph(file, origin, mv->arg1, 1, ++level, (leftErrGreater ? red : green), careVisited);
 			}
-			VG_(describe_IP)(mv->arg2, description, DESCRIPTION_SIZE);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg2Ip = VG_(describe_IP)(mv->arg2, NULL);
+			if (!inLibrary || !ignoreFile(arg2Ip)) {
 				writeOriginGraph(file, origin, mv->arg2, 2, level, (leftErrGreater ? green : red), careVisited);
 			}
 		} else if (mv->arg1 != 0) {
-			VG_(describe_IP)(mv->arg1, description, DESCRIPTION_SIZE);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg1Ip = VG_(describe_IP)(mv->arg1, NULL);
+			if (!inLibrary || !ignoreFile(arg1Ip)) {
 				writeOriginGraph(file, origin, mv->arg1, 1, ++level, 1, careVisited);
 			}
 		} else if (mv->arg2 != 0) {
-			VG_(describe_IP)(mv->arg2, description, DESCRIPTION_SIZE);
-			if (!inLibrary || !ignoreFile(description)) {
+			const HChar* arg2Ip = VG_(describe_IP)(mv->arg2, NULL);
+			if (!inLibrary || !ignoreFile(arg2Ip)) {
 				writeOriginGraph(file, origin, mv->arg2, 2, ++level, 1, careVisited);
 			}
 		}
 	}
 }
 
-static Bool dumpGraph(Char* fileName, ULong addr, Bool conditional, Bool careVisited) {
+static Bool dumpGraph(HChar* fileName, ULong addr, Bool conditional, Bool careVisited) {
 	if (!clo_computeMeanValue) {
 		VG_(umsg)("DUMP GRAPH (%s): Mean error computation has to be active!\n", fileName);
 		return False;
@@ -2646,8 +2630,8 @@ static Bool dumpGraph(Char* fileName, ULong addr, Bool conditional, Bool careVis
 			}
 		}
 
-		VG_(describe_IP)(svalue->origin, description, DESCRIPTION_SIZE);
-		if (ignoreFile(description)) {
+		const HChar* originIp = VG_(describe_IP)(svalue->origin, NULL);
+		if (ignoreFile(originIp)) {
 			return False;
 		}
 
@@ -2695,7 +2679,7 @@ static void printError(Char* varName, ULong addr, Bool conditional) {
 	ShadowValue* svalue = VG_(HT_lookup)(globalMemory, addr);
 	if (svalue) {
 		mpfr_inits(diff, rel, NULL);
-		
+
 		Bool isFloat = svalue->orgType == Ot_FLOAT;
 		if (svalue->orgType == Ot_FLOAT) {
 			mpfr_init(org);
@@ -2720,7 +2704,7 @@ static void printError(Char* varName, ULong addr, Bool conditional) {
 
 		mpfr_sub(diff, svalue->value, org, STD_RND);
 
-		Char typeName[7];
+		HChar typeName[7];
 		if (isFloat) {
 			VG_(strcpy)(typeName, "float");
 		} else {
@@ -2728,7 +2712,7 @@ static void printError(Char* varName, ULong addr, Bool conditional) {
 		}
 
 		VG_(umsg)("(%s) %s PRINT ERROR OF: 0x%lX\n", typeName, varName, addr);
-		Char mpfrBuf[MPFR_BUFSIZE];
+		HChar mpfrBuf[MPFR_BUFSIZE];
 		mpfrToString(mpfrBuf, &org);
 		VG_(umsg)("(%s) %s ORIGINAL:         %s\n", typeName, varName, mpfrBuf);
 		mpfrToString(mpfrBuf, &(svalue->value));
@@ -2739,14 +2723,14 @@ static void printError(Char* varName, ULong addr, Bool conditional) {
 		VG_(umsg)("(%s) %s RELATIVE ERROR:   %s\n", typeName, varName, mpfrBuf);
 		VG_(umsg)("(%s) %s CANCELED BITS:     %lld\n", typeName, varName, svalue->canceled);
 
-		VG_(describe_IP)(svalue->origin, description, DESCRIPTION_SIZE);
-		VG_(umsg)("(%s) %s Last operation: %s\n", typeName, varName, description);
+		const HChar* lastOperation = VG_(describe_IP)(svalue->origin, NULL);
+		VG_(umsg)("(%s) %s Last operation: %s\n", typeName, varName, lastOperation);
 
 		if (svalue->canceled > 0 && svalue->cancelOrigin > 0) {
-			VG_(describe_IP)(svalue->cancelOrigin, description, DESCRIPTION_SIZE);
-			VG_(umsg)("(%s) %s Cancellation origin: %s\n", typeName, varName, description);
+			const HChar* cancellationOrigin = VG_(describe_IP)(svalue->cancelOrigin, NULL);
+			VG_(umsg)("(%s) %s Cancellation origin: %s\n", typeName, varName, cancellationOrigin);
 		}
-		
+
 		VG_(umsg)("(%s) %s Operation count (max path): %'lu\n", typeName, varName, svalue->opCount);
 
 		mpfr_clears(org, diff, rel, NULL);
@@ -2763,7 +2747,7 @@ static Bool isErrorGreater(ULong addrFp, ULong addrErr) {
 	ShadowValue* svalue = VG_(HT_lookup)(globalMemory, addrFp);
 	if (svalue) {
 		mpfr_init(rel);
-		
+
 		Bool isFloat = svalue->orgType == Ot_FLOAT;
 		if (svalue->orgType == Ot_FLOAT) {
 			mpfr_init(org);
@@ -2780,8 +2764,8 @@ static Bool isErrorGreater(ULong addrFp, ULong addrErr) {
 		} else {
 			mpfr_set_ui(rel, 0, STD_RND);
 		}
-		
-		Bool isGreater = mpfr_cmp_d(rel, *errorBound) >= 0; 
+
+		Bool isGreater = mpfr_cmp_d(rel, *errorBound) >= 0;
 
 		mpfr_clears(org, rel, NULL);
 		return isGreater;
@@ -2884,8 +2868,8 @@ static void writeShadowValue(Int file, ShadowValue* svalue, Int num) {
 
 	mpfr_sub(writeSvDiff, svalue->value, writeSvOrg, STD_RND);
 
-	Char mpfrBuf[MPFR_BUFSIZE];
-	Char typeName[7];
+	HChar mpfrBuf[MPFR_BUFSIZE];
+	HChar typeName[7];
 	if (isFloat) {
 		VG_(strcpy)(typeName, "float");
 	} else {
@@ -2910,30 +2894,30 @@ static void writeShadowValue(Int file, ShadowValue* svalue, Int num) {
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 
 	if (svalue->canceled > 0 && svalue->cancelOrigin > 0) {
-		VG_(describe_IP)(svalue->cancelOrigin, description, DESCRIPTION_SIZE);
-		VG_(sprintf)(formatBuf, "    origin of maximum cancellation: %s\n", description);
+		const HChar* cancellationOrigin = VG_(describe_IP)(svalue->cancelOrigin, NULL);
+		VG_(sprintf)(formatBuf, "    origin of maximum cancellation: %s\n", cancellationOrigin);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	}
 
-	VG_(describe_IP)(svalue->origin, description, DESCRIPTION_SIZE);
-	VG_(sprintf)(formatBuf, "    last operation: %s\n", description);
+	const HChar* lastOperation = VG_(describe_IP)(svalue->origin, NULL);
+	VG_(sprintf)(formatBuf, "    last operation: %s\n", lastOperation);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	VG_(sprintf)(formatBuf, "    operation count (max path): %'lu\n", svalue->opCount);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 }
 
 static Bool areSvsEqual(ShadowValue* sv1, ShadowValue* sv2) {
-	if (sv1->opCount == sv2->opCount && sv1->origin == sv2->origin && 
-		sv1->canceled == sv2->canceled && sv1->cancelOrigin == sv2->cancelOrigin && 
+	if (sv1->opCount == sv2->opCount && sv1->origin == sv2->origin &&
+		sv1->canceled == sv2->canceled && sv1->cancelOrigin == sv2->cancelOrigin &&
 		sv1->orgType == sv2->orgType && mpfr_cmp(sv1->value, sv2->value) == 0)
 	{
-		return (sv1->orgType == Ot_FLOAT && sv1->Org.fl == sv2->Org.fl) || 
-			   (sv1->orgType == Ot_DOUBLE && sv1->Org.db == sv2->Org.db); 
+		return (sv1->orgType == Ot_FLOAT && sv1->Org.fl == sv2->Org.fl) ||
+			   (sv1->orgType == Ot_DOUBLE && sv1->Org.db == sv2->Org.db);
 	}
 	return False;
 }
 
-static Int compareShadowValues(void* n1, void* n2) {
+static Int compareShadowValues(const void* n1, const void* n2) {
 	ShadowValue* sv1 = *(ShadowValue**)n1;
 	ShadowValue* sv2 = *(ShadowValue**)n2;
 	if (sv1->opCount < sv2->opCount) return 1;
@@ -2944,8 +2928,8 @@ static Int compareShadowValues(void* n1, void* n2) {
 }
 
 static void writeMemorySpecial(ShadowValue** memory, UInt n_memory) {
-	Char fname[256];
-	HChar* clientName = VG_(args_the_exename);
+	HChar fname[256];
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(fname, "%s_shadow_values_special", clientName);
 
 	getFileName(fname);
@@ -2981,8 +2965,8 @@ static void writeMemorySpecial(ShadowValue** memory, UInt n_memory) {
 			specialFps++;
 
 			if (clo_ignoreLibraries) {
-				VG_(describe_IP)(memory[i]->origin, description, DESCRIPTION_SIZE);
-				if (ignoreFile(description)) {
+				const HChar* originIp = VG_(describe_IP)(memory[i]->origin, NULL);
+				if (ignoreFile(originIp)) {
 					skippedLibrary++;
 					continue;
 				}
@@ -3002,7 +2986,7 @@ static void writeMemorySpecial(ShadowValue** memory, UInt n_memory) {
 		}
 	}
 
-	VG_(sprintf)(formatBuf, "%'u%s out of %'u shadow values are in this file\n", numWritten, 
+	VG_(sprintf)(formatBuf, "%'u%s out of %'u shadow values are in this file\n", numWritten,
 		numWritten == MAX_ENTRIES_PER_FILE ? " (maximum number written to file)" : "", total);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	if (skippedLibrary > 0) {
@@ -3022,8 +3006,8 @@ static void writeMemorySpecial(ShadowValue** memory, UInt n_memory) {
 }
 
 static void writeMemoryCanceled(ShadowValue** memory, UInt n_memory) {
-	Char fname[256];
-	HChar* clientName = VG_(args_the_exename);
+	HChar fname[256];
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(fname, "%s_shadow_values_canceled", clientName);
 
 	getFileName(fname);
@@ -3050,8 +3034,8 @@ static void writeMemoryCanceled(ShadowValue** memory, UInt n_memory) {
 			fpsWithError++;
 
 			if (clo_ignoreLibraries) {
-				VG_(describe_IP)(memory[i]->origin, description, DESCRIPTION_SIZE);
-				if (ignoreFile(description)) {
+				const HChar* originIp = VG_(describe_IP)(memory[i]->origin, NULL);
+				if (ignoreFile(originIp)) {
 					skippedLibrary++;
 					continue;
 				}
@@ -3071,7 +3055,7 @@ static void writeMemoryCanceled(ShadowValue** memory, UInt n_memory) {
 		}
 	}
 
-	VG_(sprintf)(formatBuf, "%'u%s out of %'u shadow values are in this file\n", numWritten, 
+	VG_(sprintf)(formatBuf, "%'u%s out of %'u shadow values are in this file\n", numWritten,
 		numWritten == MAX_ENTRIES_PER_FILE ? " (maximum number written to file)" : "", total);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	if (skippedLibrary > 0) {
@@ -3091,8 +3075,8 @@ static void writeMemoryCanceled(ShadowValue** memory, UInt n_memory) {
 }
 
 static void writeMemoryRelError(ShadowValue** memory, UInt n_memory) {
-	Char fname[256];
-	HChar* clientName = VG_(args_the_exename);
+	HChar fname[256];
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(fname, "%s_shadow_values_relative_error", clientName);
 
 	getFileName(fname);
@@ -3132,8 +3116,8 @@ static void writeMemoryRelError(ShadowValue** memory, UInt n_memory) {
 				fpsWithError++;
 
 				if (clo_ignoreLibraries) {
-					VG_(describe_IP)(memory[i]->origin, description, DESCRIPTION_SIZE);
-					if (ignoreFile(description)) {
+					const HChar* originIp = VG_(describe_IP)(memory[i]->origin, NULL);
+					if (ignoreFile(originIp)) {
 						skippedLibrary++;
 						continue;
 					}
@@ -3170,7 +3154,7 @@ static void writeMemoryRelError(ShadowValue** memory, UInt n_memory) {
 		}
 	}
 
-	VG_(sprintf)(formatBuf, "%'u%s out of %'u shadow values are in this file\n", numWritten, 
+	VG_(sprintf)(formatBuf, "%'u%s out of %'u shadow values are in this file\n", numWritten,
 		numWritten == MAX_ENTRIES_PER_FILE ? " (maximum number written to file)" : "", total);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	if (skippedLibrary > 0) {
@@ -3193,7 +3177,7 @@ static void writeMemoryRelError(ShadowValue** memory, UInt n_memory) {
 
 static void endAnalysis(void) {
 	UInt n_memory = 0;
-	ShadowValue** memory = VG_(HT_to_array)(globalMemory, &n_memory);
+	ShadowValue** memory = (ShadowValue**) VG_(HT_to_array)(globalMemory, &n_memory);
 	VG_(ssort)(memory, n_memory, sizeof(VgHashNode*), compareShadowValues);
 
 	writeMemoryRelError(memory, n_memory);
@@ -3203,7 +3187,7 @@ static void endAnalysis(void) {
 	VG_(free)(memory);
 }
 
-static Int compareMVAddr(void* n1, void* n2) {
+static Int compareMVAddr(const void* n1, const void* n2) {
 	MeanValue* mv1 = *(MeanValue**)n1;
 	MeanValue* mv2 = *(MeanValue**)n2;
 	if (mv1->key < mv2->key) return -1;
@@ -3211,7 +3195,7 @@ static Int compareMVAddr(void* n1, void* n2) {
 	return 0;
 }
 
-static Int compareMVCanceled(void* n1, void* n2) {
+static Int compareMVCanceled(const void* n1, const void* n2) {
 	MeanValue* mv1 = *(MeanValue**)n1;
 	MeanValue* mv2 = *(MeanValue**)n2;
 	if (mv1->cancellationBadnessMax < mv2->cancellationBadnessMax) return 1;
@@ -3221,7 +3205,7 @@ static Int compareMVCanceled(void* n1, void* n2) {
 	return 0;
 }
 
-static Int compareMVIntroError(void* n1, void* n2) {
+static Int compareMVIntroError(const void* n1, const void* n2) {
 	MeanValue* mv1 = *(MeanValue**)n1;
 	MeanValue* mv2 = *(MeanValue**)n2;
 
@@ -3234,7 +3218,7 @@ static Int compareMVIntroError(void* n1, void* n2) {
 	return 0;
 }
 
-static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool forCanceled) {
+static void writeMeanValues(HChar* fname, Int (*cmpFunc) (const void*, const void*), Bool forCanceled) {
 	if (!clo_computeMeanValue) {
 		return;
 	}
@@ -3249,7 +3233,7 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 	writeWarning(file);
 
 	UInt n_values = 0;
-	MeanValue** values = VG_(HT_to_array)(meanValues, &n_values);
+	MeanValue** values = (MeanValue**) VG_(HT_to_array)(meanValues, &n_values);
 	VG_(ssort)(values, n_values, sizeof(VgHashNode*), cmpFunc);
 
 	mpfr_t meanError, maxError, introducedError, err1, err2;
@@ -3267,10 +3251,10 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 		if (clo_ignoreAccurate && forCanceled && values[i]->canceledMax == 0) {
 			skipped++;
 			continue;
-		} 
+		}
 
-		VG_(describe_IP)(values[i]->key, description, DESCRIPTION_SIZE);
-		if (ignoreFile(description)) {
+		const HChar* originIp = VG_(describe_IP)(values[i]->key, NULL);
+		if (ignoreFile(originIp)) {
 			skippedLibrary++;
 			continue;
 		}
@@ -3283,12 +3267,12 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 		mpfr_div_ui(meanError, values[i]->sum, values[i]->count, STD_RND);
 
 		opToStr(values[i]->op);
-		Char meanErrorStr[MPFR_BUFSIZE];
+		HChar meanErrorStr[MPFR_BUFSIZE];
 		mpfrToString(meanErrorStr, &meanError);
-		Char maxErrorStr[MPFR_BUFSIZE];
+		HChar maxErrorStr[MPFR_BUFSIZE];
 		mpfrToString(maxErrorStr, &(values[i]->max));
 
-		VG_(sprintf)(formatBuf, "%s %s (%'u)\n", description, opStr, values[i]->count);
+		VG_(sprintf)(formatBuf, "%s %s (%'u)\n", originIp, opStr, values[i]->count);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 		VG_(sprintf)(formatBuf, "    avg error: %s\n", meanErrorStr);
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
@@ -3304,15 +3288,17 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 
 		if (clo_bad_cancellations) {
-			Char avgCancellationBadness[10];
-			VG_(percentify)(values[i]->cancellationBadnessSum, values[i]->count * values[i]->cancellationBadnessMax, 2, 10, avgCancellationBadness);
-			VG_(sprintf)(formatBuf, "    cancellation badness - max: %'ld, avg (sum/(count*max)):%s\n", values[i]->cancellationBadnessMax, avgCancellationBadness);
+			Double avg = 0;
+			if (values[i]->count != 0 && values[i]->cancellationBadnessMax != 0) {
+				avg = values[i]->cancellationBadnessSum * 100.0 / (values[i]->count * values[i]->cancellationBadnessMax);
+			}
+			VG_(sprintf)(formatBuf, "    cancellation badness - max: %'ld, avg (sum/(count*max)): %.1f%%\n", values[i]->cancellationBadnessMax, avg);
 			my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 		}
 
 		getIntroducedError(&introducedError, values[i]);
 		if (mpfr_cmp_ui(introducedError, 0) > 0) {
-			Char introErrorStr[MPFR_BUFSIZE];
+			HChar introErrorStr[MPFR_BUFSIZE];
 			mpfrToString(introErrorStr, &introducedError);
 			VG_(sprintf)(formatBuf, "    introduced error (max path): %s\n", introErrorStr);
 		} else {
@@ -3323,7 +3309,7 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	}
 
-	VG_(sprintf)(formatBuf, "%'d%s out of %'d operations are listed in this file\n", 
+	VG_(sprintf)(formatBuf, "%'d%s out of %'d operations are listed in this file\n",
 		fpsWritten, fpsWritten == MAX_ENTRIES_PER_FILE ? " (maximum number written to file)" : "", n_values);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	if (skipped > 0) {
@@ -3348,7 +3334,7 @@ static void writeMeanValues(Char* fname, Int (*cmpFunc) (void*, void*), Bool for
 	VG_(free)(values);
 }
 
-static Int compareStageReports(void* n1, void* n2) {
+static Int compareStageReports(const void* n1, const void* n2) {
 	StageReport* sr1 = *(StageReport**)n1;
 	StageReport* sr2 = *(StageReport**)n2;
 	if (sr1->count < sr2->count) return 1;
@@ -3365,7 +3351,7 @@ static Int compareStageReports(void* n1, void* n2) {
 	return 0;
 }
 
-static void writeStageReports(Char* fname) {
+static void writeStageReports(HChar* fname) {
 	Bool writeReports = False;
 	Int i;
 	for (i = 0; i < MAX_STAGES; i++) {
@@ -3395,7 +3381,7 @@ static void writeStageReports(Char* fname) {
 		numStages++;
 
 		UInt n_reports = 0;
-		StageReport** reports = VG_(HT_to_array)(stageReports[i], &n_reports);
+		StageReport** reports = (StageReport**) VG_(HT_to_array)(stageReports[i], &n_reports);
 		VG_(ssort)(reports, n_reports, sizeof(VgHashNode*), compareStageReports);
 		totalReports += n_reports;
 
@@ -3426,19 +3412,19 @@ static void writeStageReports(Char* fname) {
 
 		VG_(sprintf)(formatBuf, "\n");
 		my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
-	
+
 		VG_(free)(reports);
 		if (reportsWritten > MAX_ENTRIES_PER_FILE) {
 			break;
 		}
 	}
 
-	VG_(sprintf)(formatBuf, "%'d%s out of %'d reports are listed in this file\n", 
+	VG_(sprintf)(formatBuf, "%'d%s out of %'d reports are listed in this file\n",
 		reportsWritten, reportsWritten == MAX_ENTRIES_PER_FILE ? " (maximum number written to file)" : "", totalReports);
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
 	VG_(sprintf)(formatBuf, "%d stage%s produced reports\n", numStages, numStages > 1 ? "s" : "");
 	my_fwrite(file, (void*)formatBuf, VG_(strlen)(formatBuf));
-	
+
 	fwrite_flush();
 	VG_(close)(file);
 	VG_(umsg)("STAGE REPORTS (%s): successful\n", fname);
@@ -3447,7 +3433,7 @@ static void writeStageReports(Char* fname) {
 static void fd_fini(Int exitcode) {
 	endAnalysis();
 
-	HChar* clientName = VG_(args_the_exename);
+	const HChar* clientName = VG_(args_the_exename);
 	VG_(sprintf)(filename, "%s_mean_errors_addr", clientName);
 	writeMeanValues(filename, &compareMVAddr, False);
 	if (clo_bad_cancellations) {
@@ -3483,10 +3469,10 @@ static Bool fd_handle_client_request(ThreadId tid, UWord* arg, UWord* ret) {
 			printError((Char*)arg[1], arg[2], True);
 			break;
 		case VG_USERREQ__DUMP_ERROR_GRAPH:
-			dumpGraph((Char*)arg[1], arg[2], False, False);
+			dumpGraph((HChar*)arg[1], arg[2], False, False);
 			break;
 		case VG_USERREQ__COND_DUMP_ERROR_GRAPH:
-			dumpGraph((Char*)arg[1], arg[2], True, False);
+			dumpGraph((HChar*)arg[1], arg[2], True, False);
 			break;
 		case VG_USERREQ__BEGIN_STAGE:
 			stageStart((Int)arg[1]);
@@ -3536,7 +3522,7 @@ static void fd_post_clo_init(void) {
 	VG_(umsg)("sim-original=%s\n", clo_simulateOriginal ? "yes" : "no");
 	VG_(umsg)("analyze-all=%s\n", clo_analyze ? "yes" : "no");
 	VG_(umsg)("bad-cancellations=%s\n", clo_bad_cancellations ? "yes" : "no");
-    VG_(umsg)("ignore-end=%s\n", clo_ignore_end ? "yes" : "no");	
+  VG_(umsg)("ignore-end=%s\n", clo_ignore_end ? "yes" : "no");
 
 	mpfr_set_default_prec(clo_precision);
 
@@ -3544,11 +3530,12 @@ static void fd_post_clo_init(void) {
 	meanValues = VG_(HT_construct)("Mean values");
 
 	storeArgs = VG_(malloc)("fd.init.1", sizeof(Store));
-	muxArgs = VG_(malloc)("fd.init.2", sizeof(Mux0X));
+	muxArgs = VG_(malloc)("fd.init.2", sizeof(ITE));
 	unOpArgs = VG_(malloc)("fd.init.3", sizeof(UnOp));
 	binOpArgs = VG_(malloc)("fd.init.4", sizeof(BinOp));
 	triOpArgs = VG_(malloc)("fd.init.5", sizeof(TriOp));
 	circRegs = VG_(malloc)("fd.init.6", sizeof(CircularRegs));
+	threadRegisters = VG_(malloc)("fd.init.7", VG_N_THREADS * sizeof(ShadowValue**));
 
 	mpfr_inits(meanOrg, meanRelError, NULL);
 	mpfr_inits(stageOrg, stageDiff, stageRelError, NULL);
@@ -3573,10 +3560,12 @@ static void fd_post_clo_init(void) {
 
 	Int j;
 	for (i = 0; i < VG_N_THREADS; i++) {
+		threadRegisters[i] = VG_(malloc)("fd.init.10", MAX_REGISTERS * sizeof(ShadowValue*));
 		for (j = 0; j < MAX_REGISTERS; j++) {
 			threadRegisters[i][j] = NULL;
 		}
 	}
+
 	for (i = 0; i < MAX_TEMPS; i++) {
 		localTemps[i] = NULL;
 	}
@@ -3591,23 +3580,23 @@ static void fd_post_clo_init(void) {
 
 static void fd_pre_clo_init(void) {
    	VG_(details_name)            ("FpDebug");
-   	VG_(details_version)         ("0.1");
+   	VG_(details_version)         ("0.2");
    	VG_(details_description)     ("Floating-point arithmetic debugger");
-   	VG_(details_copyright_author)("Copyright (C) 2010-2011 by Florian Benz.");
+   	VG_(details_copyright_author)("Copyright (C) 2010-2017 by Florian Benz.");
    	VG_(details_bug_reports_to)  ("florianbenz1@gmail.com");
 
    	VG_(basic_tool_funcs)        (fd_post_clo_init,
                                  fd_instrument,
                                  fd_fini);
 
-	VG_(needs_command_line_options)(fd_process_cmd_line_option,
+	VG_(needs_command_line_options)(fd_process_cmd_line_options,
 									fd_print_usage,
 									fd_print_debug_usage);
-	
+
 	VG_(needs_client_requests)   (fd_handle_client_request);
 
 	/* Calls to C library functions in GMP and MPFR have to be replaced with the Valgrind versions.
-	   The function mp_set_memory_functions is part of GMP and thus MPFR, all others have been added 
+	   The function mp_set_memory_functions is part of GMP and thus MPFR, all others have been added
 	   to MPFR. Therefore, this only works with pateched versions of GMP and MPFR. */
 	mp_set_memory_functions(gmp_alloc, gmp_realloc, gmp_free);
 	mpfr_set_strlen_function(VG_(strlen));
@@ -3622,4 +3611,3 @@ VG_DETERMINE_INTERFACE_VERSION(fd_pre_clo_init)
 /*--------------------------------------------------------------------*/
 /*--- end                                                          ---*/
 /*--------------------------------------------------------------------*/
-

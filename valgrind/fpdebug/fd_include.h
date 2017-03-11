@@ -8,7 +8,7 @@
    This file is part of FpDebug, a heavyweight Valgrind tool for
    detecting floating-point accuracy problems.
 
-   Copyright (C) 2010-2011 Florian Benz 
+   Copyright (C) 2010-2017 Florian Benz
       florianbenz1@gmail.com
 
    This program is free software; you can redistribute it and/or
@@ -51,10 +51,10 @@
 #include "pub_tool_xarray.h"
 #include "pub_tool_hashtable.h"
 
-typedef 
-   enum { 
+typedef
+   enum {
       Ot_INVALID,
-      Ot_FLOAT, 
+      Ot_FLOAT,
       Ot_DOUBLE
    }
    OrgType;
@@ -75,7 +75,7 @@ typedef struct _ShadowValue {
 		Addr				origin;
 
 		mpfr_exp_t			canceled;
-		Addr				cancelOrigin;		
+		Addr				cancelOrigin;
 
 		OrgType				orgType;
 		union {
@@ -89,7 +89,7 @@ typedef struct _ShadowValue {
 typedef struct _MeanValue {
 	struct _MeanValue* 	next;
 		UWord              	key;
-		
+
 		IROp				op;
 		UInt				count;
 		mpfr_t				sum;
@@ -114,9 +114,9 @@ typedef
 		Bool				active;
 		UInt				count;
 
-		VgHashTable			oldVals;
-		VgHashTable 		newVals;
-		VgHashTable 		limits;
+		VgHashTable* oldVals;
+		VgHashTable* newVals;
+		VgHashTable* limits;
 	} Stage;
 
 typedef struct _StageValue {
@@ -153,7 +153,7 @@ typedef
 		IRTemp	exprX;
 
 		UChar	condVal;
-	} Mux0X;
+	} ITE;
 
 typedef
 	struct {
@@ -229,4 +229,3 @@ typedef
 	} ShadowConst;
 
 #endif /* ndef __FD_INCLUDE_H */
-

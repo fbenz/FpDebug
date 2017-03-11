@@ -1,0 +1,14 @@
+For installation instructions see the main README.
+
+[source,bash]
+.General structure of using Valgrind with FpDebug
+----
+valgrind [valgrind options]--tool=fpdebug [fpdebug options] clientprogram [client options]
+----
+
+[source,bash]
+.Example
+----
+valgrind --trace-children=yes --tool=fpdebug --precision=128 glpk-4.61/examples/glpsol --math problem.mod
+----
+
