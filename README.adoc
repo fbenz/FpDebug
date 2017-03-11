@@ -4,20 +4,23 @@ link:https://www.gnu.org/licenses/gpl-2.0.html[image:https://img.shields.io/badg
 
 FpDebug  is a heavyweight Valgrind tool for detecting floating-point accuracy problems.
 
-NOTE: The version on master runs with Valgrind 3.7 and might
-not work on more recent systems than Ubuntu 12.04.
-However, a version for Valgrind 3.12 can be found here:
-https://github.com/fbenz/FpDebug/pull/2 .
-But so far it has only been tested on small examples.
-Tests have been performed on Ubuntu 16.10.
-
 The tool uses MPFR for its side-by-side computation in higher precision.
 Because MPFR is run with the tool on top of Valgrind,
 it has only access to the partial C library provided by Valgrind.
 Thus, a patch for MPFR is provided that adjusts it to run on top of Valgrind.
 As GMP is used by MFPR, a patch for GMP is also provided.
 
-NOTE: The tool was only tested on 64bit systems.
+== Origin
+
+This project was started during my Bachelor's thesis (winter 2010/11).
+The results have been published in:
+
+link:http://dl.acm.org/citation.cfm?id=2254118[A Dynamic Program Analysis to find Floating-Point Accuracy Problems]
+link:https://www.fbenz.net/static/pldi12_benz.pdf[[PDF]] +
+link:https://www.fbenz.net/[Florian Benz],
+link:https://www.bio.informatik.uni-mainz.de/andreas-hildebrandt/[Andreas Hildebrandt], and
+link:http://compilers.cs.uni-saarland.de/people/hack/[Sebastian Hack] +
+PLDI '12: Proceedings of the 2012 ACM SIGPLAN Conference on Programming Language Design and Implementation
 
 == Quick start
 
@@ -34,6 +37,15 @@ sudo docker run -it fpdebug /bin/bash
 ----
 
 == Build from source
+
+NOTE: The version on master runs with Valgrind 3.7 and might
+not work on more recent systems than Ubuntu 12.04.
+However, a version for Valgrind 3.12 can be found here:
+https://github.com/fbenz/FpDebug/pull/2 .
+But so far it has only been tested on small examples.
+Tests have been performed on Ubuntu 16.04 and Ubuntu 16.10.
+
+NOTE: Only 64bit systems are supported.
 
 The following installation instructions are for Ubuntu 12.04.5 LTS (64bit).
 The instructions should be similar for most other Linux systems.
