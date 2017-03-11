@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # This script requires a patched GMP version to be installed at $(pwd)/gmp/gmp-5.0.1/install
 # install_gmp.sh installs a pachted GMP version there.

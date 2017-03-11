@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Requires patched verions of GMP and MPFR to be present at the following paths.
 BASE=$(pwd)
@@ -10,9 +11,11 @@ rm valgrind/fpdebug/Makefile_tmp.in
 
 cd valgrind
 tar -jxvf valgrind-3.7.0.tar.bz2 --strip 1
-# Add fpdebug Makefile to ac_config_files in configure
-sed -e 's,none/Makefile none/tests/Makefile,fpdebug/Makefile none/Makefile none/tests/Makefile,g' configure > configure_tmp
-mv configure_tmp configure
+# Changes to configure:
+# * fpdebug/Makefile added ac_config_files
+# * does not fail on glibc 2.15
+# * does not fail on kernel 4.*
+mv configure_updated configure
 chmod +x configure
 # Add fpdebug to EXP_TOOLS
 sed -e 's,exp-dhat,exp-dhat fpdebug,g' Makefile.in > Makefile_tmp.in
