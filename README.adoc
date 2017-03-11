@@ -1,5 +1,7 @@
 = FpDebug
 
+link:https://www.gnu.org/licenses/gpl-2.0.html[image:https://img.shields.io/badge/license-GPL2-blue.svg[GNU General Public License, version 2]]
+
 FpDebug  is a heavyweight Valgrind tool for detecting floating-point accuracy problems.
 
 The tool uses MPFR for its side-by-side computation in higher precision.
@@ -9,6 +11,20 @@ Thus, a patch for MPFR is provided that adjusts it to run on top of Valgrind.
 As GMP is used by MFPR, a patch for GMP is also provided.
 
 NOTE: The tool was only tested on 64bit systems.
+
+== Quick start
+
+The `docker` folder contains Dockfiles for several systems
+that can be used to build and play around.
+During the build a small example program is also built and
+analyzed to check that everything works.
+
+[source,bash]
+.Build and run Docker image
+----
+sudo docker build -t fpdebug .
+sudo docker run -it fpdebug /bin/bash
+----
 
 == Build from source
 
