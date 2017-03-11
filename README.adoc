@@ -1,5 +1,7 @@
 = FpDebug
 
+link:https://www.gnu.org/licenses/gpl-2.0.html[image:https://img.shields.io/badge/license-GPL2-blue.svg[GNU General Public License, version 2]]
+
 FpDebug  is a heavyweight Valgrind tool for detecting floating-point accuracy problems.
 
 NOTE: The version on master runs with Valgrind 3.7 and might
@@ -16,6 +18,20 @@ Thus, a patch for MPFR is provided that adjusts it to run on top of Valgrind.
 As GMP is used by MFPR, a patch for GMP is also provided.
 
 NOTE: The tool was only tested on 64bit systems.
+
+== Quick start
+
+The `docker` folder contains Dockfiles for several systems
+that can be used to build and play around.
+During the build a small example program is also built and
+analyzed to check that everything works.
+
+[source,bash]
+.Build and run Docker image
+----
+sudo docker build -t fpdebug .
+sudo docker run -it fpdebug /bin/bash
+----
 
 == Build from source
 
@@ -110,24 +126,6 @@ Running on valgrind
 ==7041== MEAN ERRORS (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_mean_errors_canceled_1): successful
 ==7041== MEAN ERRORS (/home/test/pldi/FpDebug/valgrind/fpdebug/examples/test_1.out_mean_errors_intro_1): successful
 ----
-
-== Troubleshooting
-
-Problem: checking the GLIBC_VERSION version... unsupported version 2.15
-         configure: error: Valgrind requires glibc version 2.2 - 2.14
-
-Solution: http://stackoverflow.com/a/10569078
-add the following around line 6404
-"2.15)
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: 2.15 family" >&5
-$as_echo "2.15 family" >&6; }
-
-$as_echo "#define GLIBC_2_14 1" >>confdefs.h
-
-DEFAULT_SUPP="glibc-2.X.supp ${DEFAULT_SUPP}"
-DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
-DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
-;;"
 
 === License
 
