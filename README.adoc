@@ -10,7 +10,17 @@ it has only access to the partial C library provided by Valgrind.
 Thus, a patch for MPFR is provided that adjusts it to run on top of Valgrind.
 As GMP is used by MFPR, a patch for GMP is also provided.
 
-NOTE: The tool was only tested on 64bit systems.
+== Origin
+
+This project was started during my Bachelor's thesis (winter 2010/11).
+The results have been published in:
+
+link:http://dl.acm.org/citation.cfm?id=2254118[A Dynamic Program Analysis to find Floating-Point Accuracy Problems]
+link:https://www.fbenz.net/static/pldi12_benz.pdf[[PDF]] +
+link:https://www.fbenz.net/[Florian Benz],
+link:https://www.bio.informatik.uni-mainz.de/andreas-hildebrandt/[Andreas Hildebrandt], and
+link:http://compilers.cs.uni-saarland.de/people/hack/[Sebastian Hack] +
+PLDI '12: Proceedings of the 2012 ACM SIGPLAN Conference on Programming Language Design and Implementation
 
 == Quick start
 
@@ -27,6 +37,8 @@ sudo docker run -it fpdebug /bin/bash
 ----
 
 == Build from source
+
+NOTE: Only 64bit systems are supported.
 
 The following installation instructions are for Ubuntu 16.10 (64bit).
 The instructions should be similar for most other Linux systems.
