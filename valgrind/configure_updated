@@ -5365,7 +5365,7 @@ $as_echo_n "checking for the kernel version... " >&6; }
         kernel=`uname -r`
 
         case "${kernel}" in
-             2.6.*|3.*|4.*)
+             2.6.*|3.*|4.*|5.*)
         	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: 2.6.x/3.x family (${kernel})" >&5
 $as_echo "2.6.x/3.x family (${kernel})" >&6; }
 
