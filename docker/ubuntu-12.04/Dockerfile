@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
   build-essential \
   m4
 
-RUN git clone https://github.com/fbenz/FpDebug.git
+RUN git clone https://github.com/friedc/FpDebug.git
 
 WORKDIR /FpDebug
 
